@@ -69,10 +69,16 @@ socket.onmessage = event => {
         players = msg.players;
     } else if (msg.type === 'update') {
         players[msg.id] = msg.player;
+        updateMinimap(msg.players);
     } else if (msg.type === 'remove') {
         delete players[msg.id];
     } else if (msg.type === 'bullets') {
         bullets = msg.bullets;
+    }
+    else if (msg.type === 'kill') {
+        if (msg.killerId === localId) {
+            killCount++;
+        }
     }
 };
 
@@ -147,23 +153,6 @@ setInterval(() => {
     }
     updateInfoPanel();
 }, 1000);
-
-// WebSocket per sincronizzazione
-const socket = new WebSocket(`wss://${window.location.hostname}`);
-socket.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'init') {
-        localId = msg.id;
-    }
-    if (msg.type === 'update') {
-        updateMinimap(msg.players);
-    }
-    if (msg.type === 'kill') {
-        if (msg.killerId === localId) {
-            killCount++;
-        }
-    }
-};
 ""
 
 gameLoop();
