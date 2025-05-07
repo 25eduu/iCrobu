@@ -1,0 +1,25 @@
+{
+  "name": "zombs",
+  "version": "1.0.0",
+  "main": "client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ImSoFrqst/zombsroyale.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ImSoFrqst/zombsroyale/issues"
+  },
+  "homepage": "https://github.com/ImSoFrqst/zombsroyale#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.18.2"
+  }
+}
