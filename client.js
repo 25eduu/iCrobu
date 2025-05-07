@@ -28,7 +28,10 @@ canvas.addEventListener('mousemove', e => {
 document.getElementById('playButton').addEventListener('click', () => {
     nickname = document.getElementById('nicknameInput').value.trim();
     if (nickname) {
+        // Nascondi schermata di login e overlay
         document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        
         gameStarted = true;
 
         // Invia al server il nickname
@@ -38,7 +41,7 @@ document.getElementById('playButton').addEventListener('click', () => {
 
 // 🟢 Funzione aggiornata per disegnare il player con nickname
 function drawPlayer(player, isSelf = false) {
-    if (!player) return;
+    if (!gameStarted || !player) return; // 🔴 Non disegna se il gioco non è partito
     ctx.fillStyle = isSelf ? 'lime' : 'red';
     ctx.beginPath();
     ctx.arc(player.x, player.y, 10, 0, Math.PI * 2);
