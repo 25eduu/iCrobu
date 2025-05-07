@@ -28,8 +28,13 @@ wss.on('connection', socket => {
   socket.on('message', msgStr => {
     const msg = JSON.parse(msgStr);
 
+  socket.onopen = () => {
+  console.log('Connessione WebSocket stabilita');
+  };
+  
     // 🟢 Imposta il nickname al momento della connessione
     if (msg.type === 'join' && msg.nickname) {
+      console.log(`Giocatore con nickname: ${msg.nickname} sta entrando`);
       players[id].nickname = msg.nickname;
       broadcast({ type: 'update', id, player: players[id] });
     }

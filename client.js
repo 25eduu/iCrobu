@@ -1,6 +1,7 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const socket = new WebSocket('wss://zombsroyale.onrender.com');
+const safeZone = { x: 500, y: 500, radius: 200 }; // Può essere dinamica
 
 let players = {};
 let bullets = [];
@@ -86,7 +87,9 @@ document.getElementById('playButton').addEventListener('click', () => {
         document.getElementById('overlay').style.display = 'none';
         
         gameStarted = true;
-
+        // Log per vedere cosa viene inviato
+        console.log('Invio nickname al server:', nickname);
+        
         // Invia al server il nickname
         socket.send(JSON.stringify({ type: 'join', nickname }));
     }
