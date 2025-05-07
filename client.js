@@ -80,8 +80,12 @@ socket.onmessage = event => {
     } else if (msg.type === 'bullets') {
         bullets = msg.bullets;
     } else if (msg.type === 'kill') {
+        console.log("Kill event received:", msg); // 🔍 Debug: Contenuto del messaggio di kill
+
         if (msg.killerId === myId) {
+            console.log("You made a kill!"); // 🔍 Debug: Hai effettuato una kill
             killCount++;
+            updateInfoPanel();
         }
     }
 };
