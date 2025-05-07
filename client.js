@@ -76,4 +76,94 @@ socket.onmessage = event => {
     }
 };
 
+""// Minimap Implementation for ZombsRoyale Clone
+
+const minimap = document.createElement('canvas');
+minimap.width = 200;
+minimap.height = 200;
+minimap.style.position = 'absolute';
+minimap.style.top = '10px';
+minimap.style.right = '10px';
+minimap.style.border = '2px solid white';
+minimap.style.backgroundColor = '#111';
+document.body.appendChild(minimap);
+
+const minimapCtx = minimap.getContext('2d');
+const SCALE = 0.1; // Ratio for minimap scaling
+
+// Elemento per le kill e il timer
+const infoPanel = document.createElement('div');
+infoPanel.style.position = 'absolute';
+infoPanel.style.top = '220px';
+infoPanel.style.right = '10px';
+infoPanel.style.color = 'white';
+infoPanel.style.backgroundColor = '#333';
+infoPanel.style.padding = '5px';
+infoPanel.style.borderRadius = '5px';
+infoPanel.style.textAlign = 'center';
+document.body.appendChild(infoPanel);
+
+let killCount = 0;
+let timeLeft = 300; // 5 minuti
+let localId = null;
+let safeZone = { x: 100, y: 100, radius: 300 };
+
+// Funzione per aggiornare le informazioni
+function updateInfoPanel() {
+    infoPanel.innerHTML = `Kills: ${killCount} <br> Safe Zone in: ${timeLeft}s`;
+}
+
+// Disegna la minimappa con giocatori e Safe Zone
+function updateMinimap(players) {
+    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+
+    // Disegna la safe zone
+    minimapCtx.strokeStyle = 'white';
+    minimapCtx.beginPath();
+    minimapCtx.arc(safeZone.x * SCALE, safeZone.y * SCALE, safeZone.radius * SCALE, 0, 2 * Math.PI);
+    minimapCtx.stroke();
+
+    // Disegna i giocatori
+    for (const id in players) {
+        const p = players[id];
+        minimapCtx.fillStyle = id === localId ? 'green' : 'blue';
+        minimapCtx.fillRect(p.x * SCALE, p.y * SCALE, 5, 5);
+    }
+
+    // Aggiorna il pannello informativo
+    updateInfoPanel();
+}
+
+// Timer per la safe zone
+setInterval(() => {
+    if (timeLeft > 0) {
+        timeLeft--;
+    } else {
+        // Riduzione della safe zone
+        if (safeZone.radius > 50) {
+            safeZone.radius -= 10;
+        }
+        timeLeft = 60; // 60 secondi per ogni riduzione
+    }
+    updateInfoPanel();
+}, 1000);
+
+// WebSocket per sincronizzazione
+const socket = new WebSocket(`wss://${window.location.hostname}`);
+socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'init') {
+        localId = msg.id;
+    }
+    if (msg.type === 'update') {
+        updateMinimap(msg.players);
+    }
+    if (msg.type === 'kill') {
+        if (msg.killerId === localId) {
+            killCount++;
+        }
+    }
+};
+""
+
 gameLoop();
