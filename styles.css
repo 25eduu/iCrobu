@@ -20,12 +20,14 @@ canvas {
 
 #nicknameInput {
     margin-bottom: 10px;
-    padding: 5px;
-    width: 200px;
+    padding: 10px;
+    width: 250px;
+    font-size: 18px; /* 🔍 Più grande */
 }
 
 #playButton {
-    padding: 5px 10px;
+    padding: 10px 15px;
+    font-size: 18px; /* 🔍 Più grande */
     margin-top: 5px;
     cursor: pointer;
 }
