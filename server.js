@@ -64,17 +64,29 @@ function updateBullets() {
     for (let pid in players) {
       if (pid!=b.owner && players[pid]) {
         const p = players[pid];
-        if (Math.hypot(p.x-b.x, p.y-b.y) < 12) {
+        if (Math.hypot(p.x - b.x, p.y - b.y) < 12) {
           p.hp -= 20;
-          if (p.hp <= 0) delete players[pid], broadcast({ type:'remove', id:pid });
-          else broadcast({ type:'update', id:pid, player:p });
+      
+          if (p.hp <= 0) {
+              // 🔥 Evento di Kill!
+              broadcast({
+                  type: 'kill',
+                  killerId: b.owner,   // Chi ha sparato il proiettile
+                  victimId: pid        // Chi è stato colpito
+              });
+              
+              delete players[pid];
+              broadcast({ type: 'remove', id: pid });
+          } else {
+              broadcast({ type: 'update', id: pid, player: p });
+          }
           b.life = 0;
-        }
       }
     }
   }
-  bullets = bullets.filter(b => b.life>0);
-  broadcast({ type:'bullets', bullets });
+    bullets = bullets.filter(b => b.life>0);
+    broadcast({ type:'bullets', bullets });
+  }
 }
 
 setInterval(updateBullets, 1000/30);
