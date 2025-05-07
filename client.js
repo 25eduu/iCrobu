@@ -7,9 +7,50 @@ let bullets = [];
 let myId = null;
 let nickname = null;
 let gameStarted = false;
+let isLoggedIn = false; // Nuova variabile per verificare se il giocatore ha fatto login
+
 
 const keys = {};
 let mouse = { x: 0, y: 0 };
+
+// Minimappa Implementation for ZombsRoyale Clone
+const minimap = document.createElement('canvas');
+minimap.id = 'minimap'; // Assicurati che la minimappa abbia un ID per stilizzarla
+minimap.width = 200;
+minimap.height = 200;
+minimap.style.position = 'absolute';
+minimap.style.top = '10px';
+minimap.style.right = '10px';
+minimap.style.border = '2px solid white';
+minimap.style.backgroundColor = '#111';
+document.body.appendChild(minimap);
+
+const minimapCtx = minimap.getContext('2d');
+const SCALE = 0.1; // Ratio for minimap scaling
+
+function updateMinimap(players) {
+    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+
+    // Disegna la safe zone
+    minimapCtx.strokeStyle = 'white';
+    minimapCtx.beginPath();
+    minimapCtx.arc(safeZone.x * SCALE, safeZone.y * SCALE, safeZone.radius * SCALE, 0, 2 * Math.PI);
+    minimapCtx.stroke();
+
+    // Disegna i giocatori, ma non disegnarli se non è loggato
+    for (const id in players) {
+        const p = players[id];
+        if (isLoggedIn) {
+            minimapCtx.fillStyle = id === myId ? 'green' : 'blue';
+        } else {
+            minimapCtx.fillStyle = 'gray'; // Colore dei giocatori non visibili durante il login
+        }
+        minimapCtx.fillRect(p.x * SCALE, p.y * SCALE, 5, 5);
+    }
+
+    // Aggiorna il pannello informativo
+    updateInfoPanel();
+}
 
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
@@ -24,8 +65,20 @@ canvas.addEventListener('mousemove', e => {
     mouse.y = e.offsetY;
 });
 
+// Funzione per mostrare la schermata di login
+function showLoginScreen() {
+    document.getElementById('startScreen').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    // Aggiorna la minimappa anche se il giocatore non è ancora loggato
+    updateMinimap(players);
+}
+
+// Mostra il login
+showLoginScreen();
+
 // 🟢 Quando premi "Gioca"
 document.getElementById('playButton').addEventListener('click', () => {
+    isLoggedIn = true;
     nickname = document.getElementById('nicknameInput').value.trim();
     if (nickname) {
         // Nascondi schermata di login e overlay
