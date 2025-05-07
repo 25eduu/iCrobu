@@ -80,4 +80,5 @@ function updateBullets() {
 setInterval(updateBullets, 1000/30);
 
 // 3) Avvia tutto su porta 3000
-server.listen(3000, () => console.log('Game running at http://localhost:3000'));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Game running on port ${PORT}`));

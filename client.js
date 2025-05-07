@@ -2,7 +2,7 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-const socket = new WebSocket('ws://' + location.hostname + ':3000');
+const socket = new WebSocket('ws://https://zombsroyale.onrender.com');
 
 let players = {};
 let bullets = [];
