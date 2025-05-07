@@ -1,0 +1,31 @@
+/* Stili generali */
+canvas {
+    background: #2c3e50;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Schermata iniziale */
+#startScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background-color: #222;
+    padding: 20px;
+    border-radius: 10px;
+    color: white;
+}
+
+#nicknameInput {
+    margin-bottom: 10px;
+    padding: 5px;
+    width: 200px;
+}
+
+#playButton {
+    padding: 5px 10px;
+    margin-top: 5px;
+    cursor: pointer;
+}

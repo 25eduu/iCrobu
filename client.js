@@ -32,8 +32,15 @@ function drawPlayer(player, isSelf = false) {
     ctx.beginPath();
     ctx.arc(player.x, player.y, 10, 0, Math.PI * 2);
     ctx.fill();
+    
+    // 🟢 Disegna il nickname sopra il giocatore
     ctx.fillStyle = 'white';
-    ctx.fillText(player.hp + " HP", player.x - 15, player.y - 15);
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(player.nickname || 'Player', player.x, player.y - 15);
+    
+    // 🟢 Disegna l'HP sotto il nickname
+    ctx.fillText(player.hp + " HP", player.x, player.y - 25);
 }
 
 function drawBullet(bullet) {

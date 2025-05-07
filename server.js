@@ -18,25 +18,33 @@ let idCounter = 0;
 
 wss.on('connection', socket => {
   const id = ++idCounter;
-  players[id] = { x:400, y:300, hp:100 };
+
+  //  🟢 Inizializzazione con dati di base
+  players[id] = { x: 400, y: 300, hp: 100, nickname: 'Player' + id };
 
   // Invia init a questo client
-  socket.send(JSON.stringify({ type:'init', id, players }));
+  socket.send(JSON.stringify({ type: 'init', id, players }));
 
   socket.on('message', msgStr => {
     const msg = JSON.parse(msgStr);
-    // handle move / shoot come prima...
-    if (msg.type==='move' && players[id]) {
-      players[id].x = msg.x; players[id].y = msg.y;
-      broadcast({ type:'update', id, player:players[id] });
+
+    // 🟢 Imposta il nickname al momento della connessione
+    if (msg.type === 'join' && msg.nickname) {
+      players[id].nickname = msg.nickname;
+      broadcast({ type: 'update', id, player: players[id] });
     }
-    else if (msg.type==='shoot' && players[id]) {
+
+    if (msg.type === 'move' && players[id]) {
+      players[id].x = msg.x;
+      players[id].y = msg.y;
+      broadcast({ type: 'update', id, player: players[id] });
+    } else if (msg.type === 'shoot' && players[id]) {
       const speed = 5;
       bullets.push({
         x: players[id].x,
         y: players[id].y,
-        dx: Math.cos(msg.angle)*speed,
-        dy: Math.sin(msg.angle)*speed,
+        dx: Math.cos(msg.angle) * speed,
+        dy: Math.sin(msg.angle) * speed,
         owner: id,
         life: 60
       });
@@ -45,7 +53,7 @@ wss.on('connection', socket => {
 
   socket.on('close', () => {
     delete players[id];
-    broadcast({ type:'remove', id });
+    broadcast({ type: 'remove', id });
   });
 });
 
@@ -56,40 +64,36 @@ function broadcast(o) {
   });
 }
 
-// aggiornamento proiettili + collisioni (come prima)...
+// aggiornamento proiettili + collisioni
 function updateBullets() {
   for (let b of bullets) {
-    b.x += b.dx; b.y += b.dy; b.life--;
-    // collision detection...
+    b.x += b.dx;
+    b.y += b.dy;
+    b.life--;
+
     for (let pid in players) {
-      if (pid!=b.owner && players[pid]) {
+      if (pid != b.owner && players[pid]) {
         const p = players[pid];
         if (Math.hypot(p.x - b.x, p.y - b.y) < 12) {
           p.hp -= 20;
-      
+
           if (p.hp <= 0) {
-              // 🔥 Evento di Kill!
-              broadcast({
-                  type: 'kill',
-                  killerId: b.owner,   // Chi ha sparato il proiettile
-                  victimId: pid        // Chi è stato colpito
-              });
-              
-              delete players[pid];
-              broadcast({ type: 'remove', id: pid });
+            broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
+            delete players[pid];
+            broadcast({ type: 'remove', id: pid });
           } else {
-              broadcast({ type: 'update', id: pid, player: p });
+            broadcast({ type: 'update', id: pid, player: p });
           }
           b.life = 0;
+        }
       }
     }
   }
-    bullets = bullets.filter(b => b.life>0);
-    broadcast({ type:'bullets', bullets });
-  }
+  bullets = bullets.filter(b => b.life > 0);
+  broadcast({ type: 'bullets', bullets });
 }
 
-setInterval(updateBullets, 1000/30);
+setInterval(updateBullets, 1000 / 30);
 
 // 3) Avvia tutto su porta 3000
 const PORT = process.env.PORT || 10000;

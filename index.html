@@ -1,15 +1,20 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Zombs Clone</title>
-    <style>
-        canvas { background: #2c3e50; display: block; margin: 0 auto; }
-    </style>
+    <link rel="stylesheet" href="styles.css">  <!-- Collegamento al CSS esterno -->
 </head>
 <body>
-    <canvas id="game" width="1920" height="1080"></canvas>
+    <!-- Schermata iniziale -->
+    <div id="startScreen">
+        <input id="nicknameInput" placeholder="Inserisci il tuo nickname">
+        <button id="playButton">Gioca</button>
+    </div>
+
+    <!-- Canvas del gioco -->
+    <canvas id="game" width="1000" height="800"></canvas>
+    
     <script src="client.js"></script>
 </body>
 </html>
