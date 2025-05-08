@@ -188,18 +188,12 @@ socket.onmessage = event => {
 };
 
 // Variabili globali
-let selectedWeapon = "punch";
 let ammo = {
     pistol: 15,
     shotgun: 5
 };
 
 // Ascolta i click sulla barra
-document.getElementById('punch').addEventListener('click', () => {
-    selectedWeapon = "punch";
-    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'punch' }));
-    console.log("[CLIENT] Cambio arma in pugno"); // ✅ Log di controllo
-});
 
 document.getElementById('pistol').addEventListener('click', () => {
     selectedWeapon = "pistol";
