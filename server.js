@@ -70,12 +70,14 @@ wss.on('connection', socket => {
         damage: weapon.damage
       });
   });
-});
-
+  
   socket.on('close', () => {
     delete players[id];
     broadcast({ type: 'remove', id });
   });
+});
+
+  
 
 function broadcast(o) {
   const s = JSON.stringify(o);
