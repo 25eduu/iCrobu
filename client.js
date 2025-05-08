@@ -51,12 +51,12 @@ function updateMinimap(players) {
 
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
-canvas.addEventListener('mousedown', e => {
+/*canvas.addEventListener('mousedown', e => {
     if (gameStarted) {
         const angle = Math.atan2(e.offsetY - players[myId].y, e.offsetX - players[myId].x);
         socket.send(JSON.stringify({ type: 'shoot', angle }));
     }
-});
+});*/
 canvas.addEventListener('mousemove', e => {
     mouse.x = e.offsetX;
     mouse.y = e.offsetY;
@@ -128,11 +128,12 @@ function gameLoop() {
         let me = players[myId];
 
         // 🔄 Movimento limitato ai bordi della mappa
-        if (keys['w']) me.y = Math.max(0, me.y - 2);
-        if (keys['s']) me.y = Math.min(MAP_HEIGHT, me.y + 2);
-        if (keys['a']) me.x = Math.max(0, me.x - 2);
-        if (keys['d']) me.x = Math.min(MAP_WIDTH, me.x + 2);
+        if (keys['w'] && me.y > 0) me.y -= 2;
+        if (keys['s'] && me.y < MAP_HEIGHT - 10) me.y += 2;
+        if (keys['a'] && me.x > 0) me.x -= 2;
+        if (keys['d'] && me.x < MAP_WIDTH - 10) me.x += 2;
 
+        // 🔄 Inviamo subito al server il movimento
         socket.send(JSON.stringify({ type: 'move', x: me.x, y: me.y }));
 
         // 🔄 Calcolo dell'offset della camera
@@ -141,12 +142,19 @@ function gameLoop() {
 
         // 🔄 Disegna i giocatori con offset di camera
         for (let id in players) {
-            drawPlayer(players[id], id === myId, offsetX, offsetY);
+            const p = players[id];
+            if (p.x > offsetX - 50 && p.x < offsetX + canvas.width + 50 &&
+                p.y > offsetY - 50 && p.y < offsetY + canvas.height + 50) {
+                drawPlayer(p, id === myId, offsetX, offsetY);
+            }
         }
 
         // 🔄 Disegna i proiettili con offset di camera
         for (let bullet of bullets) {
-            drawBullet(bullet, offsetX, offsetY);
+            if (bullet.x > offsetX && bullet.x < offsetX + canvas.width &&
+                bullet.y > offsetY && bullet.y < offsetY + canvas.height) {
+                drawBullet(bullet, offsetX, offsetY);
+            }
         }
 
         // 🔄 Aggiorna la minimappa
@@ -155,6 +163,7 @@ function gameLoop() {
 
     requestAnimationFrame(gameLoop);
 }
+
 
 function drawBullet(bullet,offsetX=0,offsetY=0) {
     ctx.fillStyle = 'yellow';
@@ -177,5 +186,55 @@ socket.onmessage = event => {
         bullets = msg.bullets;
     }
 };
+
+// Variabili globali
+let selectedWeapon = "punch";
+let ammo = {
+    pistol: 15,
+    shotgun: 5
+};
+
+// Ascolta i click sulla barra
+document.getElementById('punch').addEventListener('click', () => selectedWeapon = "punch");
+document.getElementById('pistol').addEventListener('click', () => selectedWeapon = "pistol");
+document.getElementById('shotgun').addEventListener('click', () => selectedWeapon = "shotgun");
+
+// Aggiorna il testo dei pulsanti
+function updateWeaponUI() {
+    document.getElementById('pistol').innerText = `Pistola (${ammo.pistol})`;
+    document.getElementById('shotgun').innerText = `Fucile (${ammo.shotgun})`;
+}
+
+// Logica di sparo
+canvas.addEventListener('mousedown', e => {
+    if (gameStarted) {
+         // Calcolo dell'offset della telecamera
+         const offsetX = Math.max(0, Math.min(players[myId].x - canvas.width / 2, MAP_WIDTH - canvas.width));
+         const offsetY = Math.max(0, Math.min(players[myId].y - canvas.height / 2, MAP_HEIGHT - canvas.height));
+
+          // Calcola la posizione reale del mouse nella mappa
+        const realMouseX = e.offsetX + offsetX;
+        const realMouseY = e.offsetY + offsetY;
+
+         // Calcolo corretto dell'angolo
+        const angle = Math.atan2(realMouseY - players[myId].y, realMouseX - players[myId].x);
+        console.log(`[CLIENT] Invio attacco con pugno - Angolo: ${angle}`); // ✅ Controllo del messaggio
+
+        if (selectedWeapon === "punch") {
+            socket.send(JSON.stringify({ type: 'attack', weapon: 'punch', angle }));
+
+        } else if (selectedWeapon === "pistol" && ammo.pistol > 0) {
+            ammo.pistol--;
+            socket.send(JSON.stringify({ type: 'shoot', weapon: 'pistol', angle }));
+            
+        } else if (selectedWeapon === "shotgun" && ammo.shotgun > 0) {
+            ammo.shotgun--;
+            socket.send(JSON.stringify({ type: 'shoot', weapon: 'shotgun', angle }));
+        }
+        
+        updateWeaponUI();
+    }
+});
+
 
 gameLoop();
