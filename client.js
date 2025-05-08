@@ -195,9 +195,23 @@ let ammo = {
 };
 
 // Ascolta i click sulla barra
-document.getElementById('punch').addEventListener('click', () => selectedWeapon = "punch");
-document.getElementById('pistol').addEventListener('click', () => selectedWeapon = "pistol");
-document.getElementById('shotgun').addEventListener('click', () => selectedWeapon = "shotgun");
+document.getElementById('punch').addEventListener('click', () => {
+    selectedWeapon = "punch";
+    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'punch' }));
+    console.log("[CLIENT] Cambio arma in pugno"); // ✅ Log di controllo
+});
+
+document.getElementById('pistol').addEventListener('click', () => {
+    selectedWeapon = "pistol";
+    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'pistol' }));
+    console.log("[CLIENT] Cambio arma in pistola");
+});
+
+document.getElementById('shotgun').addEventListener('click', () => {
+    selectedWeapon = "shotgun";
+    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'shotgun' }));
+    console.log("[CLIENT] Cambio arma in fucile a pompa");
+});
 
 // Aggiorna il testo dei pulsanti
 function updateWeaponUI() {
@@ -218,7 +232,6 @@ canvas.addEventListener('mousedown', e => {
 
          // Calcolo corretto dell'angolo
         const angle = Math.atan2(realMouseY - players[myId].y, realMouseX - players[myId].x);
-        console.log(`[CLIENT] Invio attacco con pugno - Angolo: ${angle}`); // ✅ Controllo del messaggio
 
         if (selectedWeapon === "punch") {
             socket.send(JSON.stringify({ type: 'attack', weapon: 'punch', angle }));
