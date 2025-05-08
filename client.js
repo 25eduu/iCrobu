@@ -1,7 +1,9 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const socket = new WebSocket('wss://zombsroyale.onrender.com');
-const safeZone = { x: 500, y: 500, radius: 200 }; // Può essere dinamica
+const MAP_WIDTH = 3000; // Larghezza totale della mappa
+const MAP_HEIGHT = 3000; // Altezza totale della mappa
+
 
 let players = {};
 let bullets = [];
@@ -32,12 +34,6 @@ const SCALE = 0.1; // Ratio for minimap scaling
 function updateMinimap(players) {
     minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
 
-    // Disegna la safe zone
-    minimapCtx.strokeStyle = 'white';
-    minimapCtx.beginPath();
-    minimapCtx.arc(safeZone.x * SCALE, safeZone.y * SCALE, safeZone.radius * SCALE, 0, 2 * Math.PI);
-    minimapCtx.stroke();
-
     // Disegna i giocatori, ma non disegnarli se non è loggato
     for (const id in players) {
         const p = players[id];
@@ -50,7 +46,7 @@ function updateMinimap(players) {
     }
 
     // Aggiorna il pannello informativo
-    updateInfoPanel();
+    //updateInfoPanel();
 }
 
 document.addEventListener('keydown', e => keys[e.key] = true);
@@ -81,36 +77,48 @@ showLoginScreen();
 document.getElementById('playButton').addEventListener('click', () => {
     isLoggedIn = true;
     nickname = document.getElementById('nicknameInput').value.trim();
-    if (nickname) {
-        // Nascondi schermata di login e overlay
-        document.getElementById('startScreen').style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
+    const minLength = 3;
+    const maxLength = 16;
+    const nicknameRegex = /^[a-zA-Z0-9_]+$/; // Solo lettere, numeri e underscore
+    if (nickname.length < minLength || nickname.length > maxLength) {
+        alert(`Il nickname deve essere tra ${minLength} e ${maxLength} caratteri.`);
+        return;
+    }
+    if (!nicknameRegex.test(nickname)) {
+        alert("Il nickname può contenere solo lettere, numeri e underscore (_).");
+        return;
+    }
+    // Nascondi schermata di login e overlay
+    const startScreen = document.getElementById('startScreen');
+    const overlay = document.getElementById('overlay');
+    
+    if (startScreen) startScreen.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
         
-        gameStarted = true;
+    gameStarted = true;
         // Log per vedere cosa viene inviato
         console.log('Invio nickname al server:', nickname);
         
         // Invia al server il nickname
         socket.send(JSON.stringify({ type: 'join', nickname }));
-    }
 });
 
 // 🟢 Funzione aggiornata per disegnare il player con nickname
-function drawPlayer(player, isSelf = false) {
+function drawPlayer(player, isSelf = false,offsetX=0,offsetY=0) {
     if (!gameStarted || !player) return; // 🔴 Non disegna se il gioco non è partito
     ctx.fillStyle = isSelf ? 'lime' : 'red';
     ctx.beginPath();
-    ctx.arc(player.x, player.y, 10, 0, Math.PI * 2);
+    ctx.arc(player.x - offsetX, player.y -offsetY, 10, 0, Math.PI * 2);
     ctx.fill();
 
     // Nickname sopra il giocatore
     ctx.fillStyle = 'white';
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(player.nickname || 'Player', player.x, player.y - 15);
+    ctx.fillText(player.nickname || 'Player', player.x -offsetX, player.y - 15 - offsetY);
 
     // HP sotto il nickname
-    ctx.fillText(player.hp + " HP", player.x, player.y - 25);
+    ctx.fillText(player.hp + " HP", player.x-offsetX, player.y - 25 -offsetY);
 }
 
 function gameLoop() {
@@ -118,28 +126,40 @@ function gameLoop() {
 
     if (gameStarted && myId && players[myId]) {
         let me = players[myId];
-        if (keys['w']) me.y -= 2;
-        if (keys['s']) me.y += 2;
-        if (keys['a']) me.x -= 2;
-        if (keys['d']) me.x += 2;
+
+        // 🔄 Movimento limitato ai bordi della mappa
+        if (keys['w']) me.y = Math.max(0, me.y - 2);
+        if (keys['s']) me.y = Math.min(MAP_HEIGHT, me.y + 2);
+        if (keys['a']) me.x = Math.max(0, me.x - 2);
+        if (keys['d']) me.x = Math.min(MAP_WIDTH, me.x + 2);
+
         socket.send(JSON.stringify({ type: 'move', x: me.x, y: me.y }));
-    }
 
-    for (let id in players) {
-        drawPlayer(players[id], id === myId);
-    }
+        // 🔄 Calcolo dell'offset della camera
+        const offsetX = Math.max(0, Math.min(me.x - canvas.width / 2, MAP_WIDTH - canvas.width));
+        const offsetY = Math.max(0, Math.min(me.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
 
-    for (let bullet of bullets) {
-        drawBullet(bullet);
+        // 🔄 Disegna i giocatori con offset di camera
+        for (let id in players) {
+            drawPlayer(players[id], id === myId, offsetX, offsetY);
+        }
+
+        // 🔄 Disegna i proiettili con offset di camera
+        for (let bullet of bullets) {
+            drawBullet(bullet, offsetX, offsetY);
+        }
+
+        // 🔄 Aggiorna la minimappa
+        updateMinimap(players);
     }
 
     requestAnimationFrame(gameLoop);
 }
 
-function drawBullet(bullet) {
+function drawBullet(bullet,offsetX=0,offsetY=0) {
     ctx.fillStyle = 'yellow';
     ctx.beginPath();
-    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+    ctx.arc(bullet.x -offsetX, bullet.y -offsetY, 3, 0, Math.PI * 2);
     ctx.fill();
 }
 

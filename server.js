@@ -24,13 +24,11 @@ wss.on('connection', socket => {
 
   // Invia init a questo client
   socket.send(JSON.stringify({ type: 'init', id, players }));
+  broadcast({ type: 'update', id, player: players[id] });
 
   socket.on('message', msgStr => {
     const msg = JSON.parse(msgStr);
 
-  socket.onopen = () => {
-  console.log('Connessione WebSocket stabilita');
-  };
   
     // 🟢 Imposta il nickname al momento della connessione
     if (msg.type === 'join' && msg.nickname) {
