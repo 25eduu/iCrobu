@@ -25,7 +25,14 @@ wss.on('connection', socket => {
   const id = ++idCounter;
 
   //  🟢 Inizializzazione con dati di base
-  players[id] = { x: 400, y: 300, hp: 100, nickname: 'Player' + id,weapon: 'pistol' };
+  players[id] = { 
+    x: Math.random() * 3000, 
+    y: Math.random() * 3000, 
+    hp: 100, 
+    nickname: 'Player' + id, 
+    weapon: 'pistol',
+    isAlive: true 
+  };
 
   // Invia init a questo client
   socket.send(JSON.stringify({ type: 'init', id, players }));
@@ -35,10 +42,16 @@ wss.on('connection', socket => {
     const msg = JSON.parse(msgStr);
     console.log(`[SERVER] Ricevuto messaggio:`, msg); // ✅ Controllo di tutti i messaggi ricevuti
 
+    // Non processare messaggi per giocatori non vivi
+    if (!players[id]) return;
   
     // 🟢 Imposta il nickname al momento della connessione
     if (msg.type === 'join' && msg.nickname) {
       players[id].nickname = msg.nickname;
+      players[id].isAlive = true;
+      players[id].hp = 100;
+      players[id].x = Math.random() * 3000;
+      players[id].y = Math.random() * 3000;
       broadcast({ type: 'update', id, player: players[id] });
     }
 
@@ -56,7 +69,7 @@ wss.on('connection', socket => {
     } else if (msg.type === 'shoot' && players[id]) {
       console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
 
-       const weapon = WEAPONS[msg.weapon] || WEAPONS[players[id].weapon];
+      const weapon = WEAPONS[msg.weapon] || WEAPONS[players[id].weapon];
       // 🔫 Pistola o fucile
       bullets.push({
         x: players[id].x,
@@ -78,8 +91,6 @@ wss.on('connection', socket => {
   });
 });
 
-  
-
 function broadcast(o) {
   const s = JSON.stringify(o);
   wss.clients.forEach(c => {
@@ -95,15 +106,19 @@ function updateBullets() {
     b.life--;
 
     for (let pid in players) {
-      if (pid != b.owner && players[pid]) {
+      if (pid != b.owner && players[pid] && players[pid].isAlive) {
         const p = players[pid];
         if (Math.hypot(p.x - b.x, p.y - b.y) < 12) {
           p.hp -= b.damage;
 
           if (p.hp <= 0) {
+            p.isAlive = false;
             broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
-            delete players[pid];
-            broadcast({ type: 'remove', id: pid });
+            broadcast({ type: 'died', id: pid });
+            setTimeout(() => {
+              delete players[pid];
+              broadcast({ type: 'remove', id: pid });
+            }, 3000); // 3 secondi di tempo per mostrare l'animazione di morte
           } else {
             broadcast({ type: 'update', id: pid, player: p });
           }

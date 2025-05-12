@@ -2,25 +2,53 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Zombs Clone</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombs Royale Clone</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Schermata iniziale -->
     <div id="startScreen">
-        <input id="nicknameInput" placeholder="Inserisci il tuo nickname">
-        <button id="playButton">Gioca</button>
+        <div>
+            <h1>Welcome to Zombs Royale</h1>
+            <input 
+                id="nicknameInput" 
+                placeholder="Enter your nickname"
+                maxlength="16"
+            >
+            <button 
+                id="playButton"
+            >
+                Play Now
+            </button>
+        </div>
     </div>
-
-    <!-- Overlay scuro -->
-    <div id="overlay"></div>
 
     <!-- Canvas del gioco -->
     <canvas id="game" width="1920" height="1080"></canvas>
+
     <!-- Weapon Bar -->
     <div id="weaponBar">
-        <button id="pistol">Pistola (15)</button>
-        <button id="shotgun">Fucile (5)</button>
+        <button id="pistol">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H7"></path>
+                <path d="m11 8 2 2"></path>
+                <path d="m16 6 2 2"></path>
+                <path d="m7 13.5a5 5 0 1 0 10 0V10H7Z"></path>
+                <path d="m7 13.5V16a5 5 0 0 0 10 0v-2.5"></path>
+                <path d="M12 19v3"></path>
+            </svg>
+            Pistol (15)
+        </button>
+        <button id="shotgun">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 16v4h16v-4"></path>
+                <path d="M14.5 12V7a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v5"></path>
+                <path d="M8 7H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5"></path>
+                <path d="M22 12h-5V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1Z"></path>
+            </svg>
+            Shotgun (5)
+        </button>
     </div>
 
     <script src="client.js"></script>
