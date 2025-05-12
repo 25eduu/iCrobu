@@ -55,10 +55,8 @@ wss.on('connection', socket => {
 
     } else if (msg.type === 'shoot' && players[id]) {
       console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
-      
-    }
 
-      const weapon = WEAPONS[players[id].weapon];
+       const weapon = WEAPONS[players[id].weapon];
       // 🔫 Pistola o fucile
       bullets.push({
         x: players[id].x,
@@ -69,6 +67,9 @@ wss.on('connection', socket => {
         life: weapon.range / weapon.speed,
         damage: weapon.damage
       });
+      
+    }
+
   });
   
   socket.on('close', () => {
@@ -97,7 +98,7 @@ function updateBullets() {
       if (pid != b.owner && players[pid]) {
         const p = players[pid];
         if (Math.hypot(p.x - b.x, p.y - b.y) < 12) {
-          p.hp -= 20;
+          p.hp -= b.damage;
 
           if (p.hp <= 0) {
             broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
