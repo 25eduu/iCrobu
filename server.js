@@ -55,10 +55,10 @@ wss.on('connection', socket => {
 
     } else if (msg.type === 'shoot' && players[id]) {
       console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
-      const weapon = WEAPONS[players[id].weapon];
+      
     }
 
-    
+      const weapon = WEAPONS[players[id].weapon];
       // 🔫 Pistola o fucile
       bullets.push({
         x: players[id].x,
