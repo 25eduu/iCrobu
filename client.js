@@ -191,36 +191,41 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (gameStarted && myId && players[myId]) {
-    let me = players[myId];
+        let me = players[myId];
 
-    // 🔄 Movimento limitato ai bordi della mappa
-    if (keys['w'] && me.y > 0) me.y -= 2;
-    if (keys['s'] && me.y < MAP_HEIGHT - 10) me.y += 2;
-    if (keys['a'] && me.x > 0) me.x -= 2;
-    if (keys['d'] && me.x < MAP_WIDTH - 10) me.x += 2;
+        // 🔄 Movimento limitato ai bordi della mappa
+        if (keys['w'] && me.y > 0) me.y -= 2;
+        if (keys['s'] && me.y < MAP_HEIGHT - 10) me.y += 2;
+        if (keys['a'] && me.x > 0) me.x -= 2;
+        if (keys['d'] && me.x < MAP_WIDTH - 10) me.x += 2;
 
-    // 🔄 Calcolo dell'offset della camera (NUOVA VERSIONE)
-    const offsetX = Math.min(Math.max(0, me.x - canvas.width / 2), MAP_WIDTH - canvas.width);
-    const offsetY = Math.min(Math.max(0, me.y - canvas.height / 2), MAP_HEIGHT - canvas.height);
+        // 🔄 Inviamo subito al server il movimento
+        socket.send(JSON.stringify({ type: 'move', x: me.x, y: me.y }));
 
-    // 🔄 Inviamo subito al server il movimento
-    socket.send(JSON.stringify({ type: 'move', x: me.x, y: me.y }));
+        // 🔄 Calcolo dell'offset della camera
+        const offsetX = Math.max(0, Math.min(me.x - canvas.width / 2, MAP_WIDTH - canvas.width));
+        const offsetY = Math.max(0, Math.min(me.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
 
-    // 🔄 Disegna i giocatori con offset di camera
-    for (let id in players) {
-        const p = players[id];
-        drawPlayer(p, id === myId, offsetX, offsetY);
+        // 🔄 Disegna i giocatori con offset di camera
+        for (let id in players) {
+            const p = players[id];
+            if (p.x > offsetX - 50 && p.x < offsetX + canvas.width + 50 &&
+                p.y > offsetY - 50 && p.y < offsetY + canvas.height + 50) {
+                drawPlayer(p, id === myId, offsetX, offsetY);
+            }
+        }
+
+        // 🔄 Disegna i proiettili con offset di camera
+        for (let bullet of bullets) {
+            if (bullet.x > offsetX && bullet.x < offsetX + canvas.width &&
+                bullet.y > offsetY && bullet.y < offsetY + canvas.height) {
+                drawBullet(bullet, offsetX, offsetY);
+            }
+        }
+
+        // 🔄 Aggiorna la minimappa
+        updateMinimap(players);
     }
-
-    // 🔄 Disegna i proiettili con offset di camera
-    for (let bullet of bullets) {
-        drawBullet(bullet, offsetX, offsetY);
-    }
-
-    // 🔄 Aggiorna la minimappa
-    updateMinimap(players);
-}
-
 
     requestAnimationFrame(gameLoop);
 }
@@ -288,7 +293,7 @@ function updateWeaponUI() {
 // Logica di sparo
 canvas.addEventListener('mousedown', e => {
     if (gameStarted) {
-         // Calcolo dell'offset della telecamera
+        // Calcolo dell'offset della telecamera
          const offsetX = Math.max(0, Math.min(players[myId].x - canvas.width / 2, MAP_WIDTH - canvas.width));
          const offsetY = Math.max(0, Math.min(players[myId].y - canvas.height / 2, MAP_HEIGHT - canvas.height));
 
