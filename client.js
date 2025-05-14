@@ -4,6 +4,21 @@ const socket = new WebSocket('wss://zombsroyale.onrender.com');
 const MAP_WIDTH = 3000; // Larghezza totale della mappa
 const MAP_HEIGHT = 3000; // Altezza totale della mappa
 
+//Caricamento immagini
+const mappaSVG = new Image();
+mappaSVG.src = 'img/game_map.svg';
+
+const pistolSVG = new Image();
+pistolSVG.src = 'img/pistol_character.svg';
+
+const shotgunSVG = new Image();
+shotgunSVG.src = 'img/shotgun_character.svg';
+
+const bulletImage = new Image();
+bulletImage.src = 'img/bullet.png';
+
+
+
 let players = {};
 let bullets = [];
 let myId = null;
@@ -54,43 +69,15 @@ function updateMinimap(players) {
     }
 }
 
-// Create Death Screen
-const deathScreen = document.createElement('div');
-deathScreen.id = 'deathScreen';
-deathScreen.style.display = 'none';
-deathScreen.style.position = 'fixed';
-deathScreen.style.top = '0';
-deathScreen.style.left = '0';
-deathScreen.style.width = '100%';
-deathScreen.style.height = '100%';
-deathScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-deathScreen.style.zIndex = '1000';
-deathScreen.style.justifyContent = 'center';
-deathScreen.style.alignItems = 'center';
-deathScreen.style.flexDirection = 'column';
-deathScreen.innerHTML = `
-    <h2 style="color: white; margin-bottom: 20px;">You Died!</h2>
-    <p style="color: white; margin-bottom: 20px;">Kills: <span id="finalKills">0</span></p>
-    <button id="respawnButton" style="
-        padding: 10px 20px; 
-        background-color: #4a8af4; 
-        color: white; 
-        border: none; 
-        border-radius: 8px; 
-        cursor: pointer;
-    ">Respawn</button>
-`;
-document.body.appendChild(deathScreen);
 
 // Respawn button event listener
-document.getElementById('respawnButton').addEventListener('click', () => {
+/*document.getElementById('respawnButton').addEventListener('click', () => {
     deathScreen.style.display = 'none';
     showLoginScreen();
-});
+});*/
 
 // Initialize kill counter div and death screen as hidden
 killCounterDiv.style.display = 'none';
-deathScreen.style.display = 'none';
 
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
@@ -174,7 +161,7 @@ function drawPlayer(player, isSelf = false, offsetX = 0, offsetY = 0) {
     if (!gameStarted || !player) return; // 🔴 Non disegna se il gioco non è partito
     ctx.fillStyle = isSelf ? 'lime' : 'red';
     ctx.beginPath();
-    ctx.arc(player.x - offsetX, player.y - offsetY, 10, 0, Math.PI * 2);
+    ctx.drawImage(pistolSVG, player.x - offsetX - 20, player.y - offsetY - 20, 80, 80 );
     ctx.fill();
 
     // Nickname sopra il giocatore
@@ -206,6 +193,9 @@ function gameLoop() {
         const offsetX = Math.max(0, Math.min(me.x - canvas.width / 2, MAP_WIDTH - canvas.width));
         const offsetY = Math.max(0, Math.min(me.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
 
+         // 🗺️ Disegna la mappa
+        ctx.drawImage(mappaSVG, -offsetX, -offsetY, MAP_WIDTH, MAP_HEIGHT);
+
         // 🔄 Disegna i giocatori con offset di camera
         for (let id in players) {
             const p = players[id];
@@ -233,7 +223,7 @@ function gameLoop() {
 function drawBullet(bullet, offsetX = 0, offsetY = 0) {
     ctx.fillStyle = 'yellow';
     ctx.beginPath();
-    ctx.arc(bullet.x - offsetX, bullet.y - offsetY, 3, 0, Math.PI * 2);
+    ctx.drawImage(bulletImage, bullet.x - offsetX - 5, bullet.y - offsetY - 5, 10, 10);
     ctx.fill();
 }
 
@@ -259,7 +249,6 @@ socket.onmessage = event => {
         if (msg.id === myId) {
             gameStarted = false;
             document.getElementById('finalKills').textContent = killCount;
-            deathScreen.style.display = 'flex';
             killCounterDiv.style.display = 'none';
         }
     }
@@ -275,13 +264,11 @@ let ammo = {
 document.getElementById('pistol').addEventListener('click', () => {
     selectedWeapon = "pistol";
     socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'pistol' }));
-    console.log("[CLIENT] Cambio arma in pistola");
 });
 
 document.getElementById('shotgun').addEventListener('click', () => {
     selectedWeapon = "shotgun";
     socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'shotgun' }));
-    console.log("[CLIENT] Cambio arma in fucile a pompa");
 });
 
 // Aggiorna il testo dei pulsanti

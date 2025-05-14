@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+  <!-- Personaggio con fucile visto dall'alto -->
+  <g>
+    <!-- Corpo/torso -->
+    <circle cx="10" cy="10" r="4" fill="#3377aa" />
+    
+    <!-- Testa -->
+    <circle cx="10" cy="10" r="2" fill="#ffcc99" />
+    
+    <!-- Capelli -->
+    <path d="M8.5,9 Q10,7.5 11.5,9" stroke="#663300" stroke-width="1" fill="none" />
+    
+    <!-- Fucile (visto dall'alto) -->
+    <g>
+      <!-- Corpo del fucile -->
+      <rect x="10" y="6" width="1.5" height="8" fill="#8B4513" rx="0.3" />
+      
+      <!-- Canna del fucile -->
+      <rect x="10.25" y="2" width="1" height="4" fill="#444" rx="0.2" />
+      
+      <!-- Caricatore -->
+      <rect x="11.5" y="9" width="1" height="2" fill="#555" rx="0.2" />
+      
+      <!-- Calcio -->
+      <path d="M10.25,14 h1 l0.5,2 h-2 l0.5,-2" fill="#8B4513" />
+    </g>
+    
+    <!-- Ombra sotto il personaggio -->
+    <ellipse cx="10" cy="10.5" rx="3.8" ry="3.8" fill="#000" fill-opacity="0.2" />
+  </g>
+</svg>

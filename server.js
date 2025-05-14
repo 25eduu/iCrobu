@@ -115,10 +115,8 @@ function updateBullets() {
             p.isAlive = false;
             broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
             broadcast({ type: 'died', id: pid });
-            setTimeout(() => {
-              delete players[pid];
-              broadcast({ type: 'remove', id: pid });
-            }, 3000); // 3 secondi di tempo per mostrare l'animazione di morte
+            delete players[pid];
+            broadcast({ type: 'remove', id: pid });
           } else {
             broadcast({ type: 'update', id: pid, player: p });
           }
