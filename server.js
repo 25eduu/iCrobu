@@ -26,8 +26,8 @@ wss.on('connection', socket => {
 
   //  🟢 Inizializzazione con dati di base
   players[id] = { 
-    x: Math.random() * 3000, 
-    y: Math.random() * 3000, 
+    x: 1500, 
+    y: 1500, 
     hp: 100, 
     nickname: 'Player' + id, 
     weapon: 'pistol',

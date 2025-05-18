@@ -12,7 +12,7 @@ const pistolSVG = new Image();
 pistolSVG.src = 'img/pistol_character.svg';
 
 const shotgunSVG = new Image();
-shotgunSVG.src = 'img/shotgun_character.svg';
+shotgunSVG.src = 'img/rifle_character.svg';
 
 const bulletImage = new Image();
 bulletImage.src = 'img/bullet.png';
@@ -52,10 +52,13 @@ killCounterDiv.innerText = `Kills: 0`;
 document.body.appendChild(killCounterDiv);
 
 const minimapCtx = minimap.getContext('2d');
-const SCALE = 0.1; // Ratio for minimap scaling
+const SCALE = 0.067; // Ratio for minimap scaling
 
 function updateMinimap(players) {
     minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+
+    // Disegna l'intera mappa SVG ridimensionata
+    minimapCtx.drawImage(mappaSVG, 0, 0, MAP_WIDTH * SCALE, MAP_HEIGHT * SCALE);
 
     // Disegna i giocatori, ma non disegnarli se non è loggato
     for (const id in players) {
@@ -158,21 +161,55 @@ document.getElementById('playButton').addEventListener('click', () => {
 
 // 🟢 Funzione aggiornata per disegnare il player con nickname
 function drawPlayer(player, isSelf = false, offsetX = 0, offsetY = 0) {
-    if (!gameStarted || !player) return; // 🔴 Non disegna se il gioco non è partito
-    ctx.fillStyle = isSelf ? 'lime' : 'red';
-    ctx.beginPath();
-    ctx.drawImage(pistolSVG, player.x - offsetX - 20, player.y - offsetY - 20, 80, 80 );
-    ctx.fill();
+    if (!gameStarted || !player) return;
 
-    // Nickname sopra il giocatore
+    const sprite = player.weapon === "pistol" ? pistolSVG : shotgunSVG;
+
+    // 🔄 Calcolo delle coordinate effettive di disegno sul canvas
+    let drawX = canvas.width / 2;
+    let drawY = canvas.height / 2;
+
+    // Compensazione ai bordi
+    if (players[myId].x < canvas.width / 2) drawX = players[myId].x;
+    if (players[myId].y < canvas.height / 2) drawY = players[myId].y;
+    if (players[myId].x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - players[myId].x);
+    if (players[myId].y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - players[myId].y);
+
+    // 🔄 Calcolo dell'angolo corretto rispetto al mouse
+    const angle = Math.atan2(mouse.y - drawY, mouse.x - drawX);
+
+    ctx.save(); // Salva lo stato del contesto
+
+    // 📌 Trasla al centro del personaggio nel canvas
+    ctx.translate(drawX, drawY);
+
+    // 🔄 Ruota l'immagine
+    ctx.rotate(angle + Math.PI / 2);
+
+    // 🖼️ Disegna l'immagine centrata sul personaggio
+    ctx.drawImage(sprite, -40, -40, 80, 80);
+
+    ctx.restore(); // Ripristina lo stato precedente del contesto
+
+    // 🏷️ Nickname sopra il giocatore
     ctx.fillStyle = 'white';
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(player.nickname || 'Player', player.x - offsetX, player.y - 15 - offsetY);
+    ctx.fillText(player.nickname || 'Player', drawX, drawY - 50);
 
-    // HP sotto il nickname
-    ctx.fillText(player.hp + " HP", player.x - offsetX, player.y - 25 - offsetY);
+    // ❤️ HP sotto il nickname
+    ctx.fillText(player.hp + " HP", drawX, drawY + 50);
 }
+
+
+
+
+
+
+
+
+
+
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -221,10 +258,12 @@ function gameLoop() {
 }
 
 function drawBullet(bullet, offsetX = 0, offsetY = 0) {
-    ctx.fillStyle = 'yellow';
-    ctx.beginPath();
-    ctx.drawImage(bulletImage, bullet.x - offsetX - 5, bullet.y - offsetY - 5, 10, 10);
-    ctx.fill();
+    ctx.save();
+    ctx.translate(bullet.x - offsetX, bullet.y - offsetY);
+    const angle = Math.atan2(bullet.dy, bullet.dx);
+    ctx.rotate(angle);
+    ctx.drawImage(bulletImage, -5, -5, 10, 10);
+    ctx.restore();
 }
 
 socket.onmessage = event => {
@@ -263,11 +302,13 @@ let ammo = {
 // Ascolta i click sulla barra
 document.getElementById('pistol').addEventListener('click', () => {
     selectedWeapon = "pistol";
+    players[myId].weapon = "pistol";
     socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'pistol' }));
 });
 
 document.getElementById('shotgun').addEventListener('click', () => {
     selectedWeapon = "shotgun";
+    players[myId].weapon = "shotgun";
     socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'shotgun' }));
 });
 
@@ -280,21 +321,25 @@ function updateWeaponUI() {
 // Logica di sparo
 canvas.addEventListener('mousedown', e => {
     if (gameStarted) {
-        // Calcolo dell'offset della telecamera
-         const offsetX = Math.max(0, Math.min(players[myId].x - canvas.width / 2, MAP_WIDTH - canvas.width));
-         const offsetY = Math.max(0, Math.min(players[myId].y - canvas.height / 2, MAP_HEIGHT - canvas.height));
+        const me = players[myId];
 
-          // Calcola la posizione reale del mouse nella mappa
-        const realMouseX = e.offsetX + offsetX;
-        const realMouseY = e.offsetY + offsetY;
+        // 🖼️ Calcoliamo la posizione attuale sul canvas
+        let drawX = canvas.width / 2;
+        let drawY = canvas.height / 2;
 
-         // Calcolo corretto dell'angolo
-        const angle = Math.atan2(realMouseY - players[myId].y, realMouseX - players[myId].x);
+        // Compensazione ai bordi
+        if (me.x < canvas.width / 2) drawX = me.x;
+        if (me.y < canvas.height / 2) drawY = me.y;
+        if (me.x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - me.x);
+        if (me.y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - me.y);
 
+        // 🎯 Calcolo dell'angolo rispetto al centro del personaggio sul canvas
+        const angle = Math.atan2(e.clientY - drawY, e.clientX - drawX);
+
+        // 🛠️ Invia il messaggio di sparo al server
         if (selectedWeapon === "pistol" && ammo.pistol > 0) {
             ammo.pistol--;
             socket.send(JSON.stringify({ type: 'shoot', weapon: 'pistol', angle }));
-            
         } else if (selectedWeapon === "shotgun" && ammo.shotgun > 0) {
             ammo.shotgun--;
             socket.send(JSON.stringify({ type: 'shoot', weapon: 'shotgun', angle }));
@@ -303,8 +348,5 @@ canvas.addEventListener('mousedown', e => {
         updateWeaponUI();
     }
 });
-
-
-
 
 gameLoop();
