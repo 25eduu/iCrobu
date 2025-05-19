@@ -1,62 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Meta Tag -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Title -->
     <title>Zombs Royale Clone</title>
+    
+    <!-- Styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Schermata iniziale -->
+
+    <!-- =========================
+         START SCREEN
+    ========================== -->
     <div id="startScreen">
         <div>
             <h1>Welcome to Zombs Royale</h1>
             <input 
                 id="nicknameInput" 
+                type="text"
                 placeholder="Enter your nickname"
                 maxlength="16"
             >
-            <button 
-                id="playButton"
-            >
-                Play Now
-            </button>
+            <button id="playButton">Play Now</button>
         </div>
     </div>
 
-    <!-- Canvas del gioco -->
+    <!-- =========================
+         GAME CANVAS
+    ========================== -->
     <canvas id="game" width="1920" height="1080"></canvas>
 
-    <!-- Weapon Bar -->
+    <!-- =========================
+         WEAPON BAR
+    ========================== -->
     <div id="weaponBar">
-        <button id="pistol">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H7"></path>
-                <path d="m11 8 2 2"></path>
-                <path d="m16 6 2 2"></path>
-                <path d="m7 13.5a5 5 0 1 0 10 0V10H7Z"></path>
-                <path d="m7 13.5V16a5 5 0 0 0 10 0v-2.5"></path>
-                <path d="M12 19v3"></path>
-            </svg>
-            Pistol (15)
-        </button>
-        <button id="shotgun">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 16v4h16v-4"></path>
-                <path d="M14.5 12V7a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v5"></path>
-                <path d="M8 7H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5"></path>
-                <path d="M22 12h-5V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1Z"></path>
-            </svg>
-            Shotgun (5)
-        </button>
+        <button id="pistol">Pistol (15)</button>
+        <button id="shotgun">Shotgun (5)</button>
     </div>
 
-     <!-- Schermata di Morte -->
+    <!-- =========================
+         DEATH SCREEN
+    ========================== -->
     <div id="deathScreen" class="hidden">
         <h1>Sei stato eliminato!</h1>
         <button id="respawnButton">Respawn</button>
     </div>
 
+    <!-- =========================
+         JAVASCRIPT
+    ========================== -->
     <script src="client.js"></script>
 </body>
 </html>

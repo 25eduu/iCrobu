@@ -1,121 +1,42 @@
+// =============== DIPENDENZE ===============
 const path = require('path');
 const express = require('express');
-const app = express();
 const http = require('http');
 const WebSocket = require('ws');
 
+// =============== CONFIGURAZIONE SERVER ===============
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Servire file statici
+app.use(express.static(path.join(__dirname)));
+
+// =============== COSTANTI E VARIABILI GLOBALI ===============
 const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 
-
-// 1) HTTP server con Express
-app.use(express.static(path.join(__dirname))); // serve index.html, client.js, ecc.
-
-const server = http.createServer(app);
-
-// 2) WebSocket accorpato allo stesso server HTTP
-const wss = new WebSocket.Server({ server });
-
-let players = {};
-let bullets = [];
-let idCounter = 0;
-
-let pistolAmmoPacks = [];
-let shotgunAmmoPacks = [];
-
+// Configurazione armi
 const WEAPONS = {
   pistol: { damage: 10, speed: 8, range: 800 },
   shotgun: { damage: 20, speed: 5, range: 600 }
 };
 
-wss.on('connection', socket => {
-  const id = ++idCounter;
+// Stato del gioco
+let players = {};
+let bullets = [];
+let idCounter = 0;
+let pistolAmmoPacks = [];
+let shotgunAmmoPacks = [];
 
-  //  🟢 Inizializzazione con dati di base
-  players[id] = { 
-    x: Math.random() * MAP_WIDTH, 
-    y: Math.random() * MAP_HEIGHT, 
-    hp: 100, 
-    nickname: 'Player' + id, 
-    weapon: 'pistol',
-    isAlive: true 
-  };
-
-  // Invia init a questo client
-  socket.send(JSON.stringify({ type: 'init', id, players }));
-  broadcast({ type: 'update', id, player: players[id] });
-
-  socket.on('message', msgStr => {
-    const msg = JSON.parse(msgStr);
-    console.log(`[SERVER] Ricevuto messaggio:`, msg); // ✅ Controllo di tutti i messaggi ricevuti
-
-    // Non processare messaggi per giocatori non vivi
-    if (!players[id]) return;
-  
-    // 🟢 Imposta il nickname al momento della connessione
-    if (msg.type === 'join' && msg.nickname) {
-      players[id].nickname = msg.nickname;
-      players[id].isAlive = true;
-      players[id].hp = 100;
-      players[id].x = Math.random() * 3000;
-      players[id].y = Math.random() * 3000;
-      broadcast({ type: 'update', id, player: players[id] });
-    }
-
-    // 🔄 Cambio arma
-    else if (msg.type === 'changeWeapon' && WEAPONS[msg.weapon]) {
-      players[id].weapon = msg.weapon;
-      broadcast({ type: 'update', id, player: players[id] });
-    }
-
-    else if (msg.type === 'move' && players[id]) {
-      players[id].x = msg.x;
-      players[id].y = msg.y;
-      broadcast({ type: 'update', id, player: players[id] });
-
-    } else if (msg.type === 'shoot' && players[id]) {
-      console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
-
-      const weapon = WEAPONS[msg.weapon] || WEAPONS[players[id].weapon];
-      // 🔫 Pistola o fucile
-      bullets.push({
-        x: players[id].x,
-        y: players[id].y,
-        dx: Math.cos(msg.angle) * weapon.speed,
-        dy: Math.sin(msg.angle) * weapon.speed,
-        owner: id,
-        life: weapon.range / weapon.speed,
-        damage: weapon.damage
-      });
-      
-    }
-    else if (msg.type === 'respawn' && players[id]) {
-    players[id].hp = 100;
-    players[id].isAlive = true;
-    players[id].x = Math.random() * 3000;
-    players[id].y = Math.random() * 3000;
-    players[id].ammo = { pistol: 15, shotgun: 5 }; // Ricarica le munizioni
-    
-    // Controlliamo che broadcast funzioni
-    broadcast({ type: 'respawned', id, player: players[id] });
-}
-
-
-
-  });
-  
-  socket.on('close', () => {
-    delete players[id];
-    broadcast({ type: 'remove', id });
-  });
-});
-
-function broadcast(o) {
-  const s = JSON.stringify(o);
-  wss.clients.forEach(c => {
-    if (c.readyState === WebSocket.OPEN) {
+// =============== FUNZIONI DI UTILITY ===============
+// Invia messaggio a tutti i client connessi
+function broadcast(message) {
+  const serializedMessage = JSON.stringify(message);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
       try {
-        c.send(s);
+        client.send(serializedMessage);
       } catch (e) {
         console.error(`Errore nell'invio del messaggio: ${e.message}`);
       }
@@ -123,7 +44,66 @@ function broadcast(o) {
   });
 }
 
-// aggiornamento proiettili + collisioni
+// =============== GESTIONE MUNIZIONI E OGGETTI ===============
+function spawnAmmo(type) {
+    const ammoPack = {
+        id: Math.random().toString(36).substring(2, 9),
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        type: type
+    };
+
+    if (type === 'pistol') {
+        pistolAmmoPacks.push(ammoPack);
+    } else if (type === 'shotgun') {
+        shotgunAmmoPacks.push(ammoPack);
+    }
+
+    // Invia l'aggiornamento ai client
+    broadcast({
+        type: 'ammo_spawn',
+        ammoPack
+    });
+}
+
+function checkAmmoPickup() {
+    for (let id in players) {
+        const player = players[id];
+
+        if (player.isAlive) {
+            // Controllo munizioni pistola
+            pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
+                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
+                    // Incrementa le munizioni sul client
+                    broadcast({ 
+                        type: 'ammo_pickup', 
+                        playerId: id, 
+                        weapon: 'pistol',
+                        amount: 10
+                    });
+                    return false; // Rimuove l'oggetto dall'array
+                }
+                return true;
+            });
+
+            // Controllo munizioni fucile a pompa
+            shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
+                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
+                    broadcast({ 
+                        type: 'ammo_pickup', 
+                        playerId: id, 
+                        weapon: 'shotgun',
+                        amount: 5
+                    });
+                    return false;
+                }
+                return true;
+            });
+        }
+    }
+}
+
+// =============== AGGIORNAMENTO PROIETTILI E COLLISIONI ===============
 function updateBullets() {
   for (let b of bullets) {
     b.x += b.dx;
@@ -152,75 +132,101 @@ function updateBullets() {
   broadcast({ type: 'bullets', bullets });
 }
 
-function spawnAmmo(type) {
-    const ammoPack = {
-        id: Math.random().toString(36).substring(2, 9),
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
-        type: type
-    };
+// =============== GESTIONE CONNESSIONI WEBSOCKET ===============
+wss.on('connection', socket => {
+  const id = ++idCounter;
 
-    if (type === 'pistol') {
-        pistolAmmoPacks.push(ammoPack);
-    } else if (type === 'shotgun') {
-        shotgunAmmoPacks.push(ammoPack);
+  // Inizializzazione del nuovo giocatore
+  players[id] = { 
+    x: Math.random() * MAP_WIDTH, 
+    y: Math.random() * MAP_HEIGHT, 
+    hp: 100, 
+    nickname: 'Player' + id, 
+    weapon: 'pistol',
+    isAlive: true 
+  };
+
+  // Invia stato iniziale a questo client
+  socket.send(JSON.stringify({ type: 'init', id, players }));
+  
+  // Notifica agli altri client il nuovo giocatore
+  broadcast({ type: 'update', id, player: players[id] });
+
+  socket.on('message', msgStr => {
+    const msg = JSON.parse(msgStr);
+    console.log(`[SERVER] Ricevuto messaggio:`, msg);
+
+    // Non processare messaggi per giocatori non vivi
+    if (!players[id]) return;
+  
+    // Gestione messaggi dal client
+    if (msg.type === 'join' && msg.nickname) {
+      // Imposta il nickname e reinizializza il giocatore
+      players[id].nickname = msg.nickname;
+      players[id].isAlive = true;
+      players[id].hp = 100;
+      players[id].x = Math.random() * MAP_WIDTH;
+      players[id].y = Math.random() * MAP_HEIGHT;
+      broadcast({ type: 'update', id, player: players[id] });
     }
-
-    // 🔄 Invia l'aggiornamento ai client
-    broadcast({
-        type: 'ammo_spawn',
-        ammoPack
-    });
-}
-
-function checkAmmoPickup() {
-    for (let id in players) {
-        const player = players[id];
-
-        if (player.isAlive) {
-            // Controllo munizioni pistola
-            pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
-                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
-                    // Incrementa le munizioni sul client
-                    broadcast({ 
-                        type: 'ammo_pickup', 
-                        playerId: id, 
-                        weapon: 'pistol',
-                        amount: 10  // Puoi decidere il valore che preferisci
-                    });
-                    return false; // Rimuove l'oggetto dall'array
-                }
-                return true;
-            });
-
-            // Controllo munizioni fucile a pompa
-            shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
-                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
-                    broadcast({ 
-                        type: 'ammo_pickup', 
-                        playerId: id, 
-                        weapon: 'shotgun',
-                        amount: 5
-                    });
-                    return false;
-                }
-                return true;
-            });
-        }
+    else if (msg.type === 'changeWeapon' && WEAPONS[msg.weapon]) {
+      // Cambio arma
+      players[id].weapon = msg.weapon;
+      broadcast({ type: 'update', id, player: players[id] });
     }
-}
+    else if (msg.type === 'move' && players[id]) {
+      // Aggiornamento posizione
+      players[id].x = msg.x;
+      players[id].y = msg.y;
+      broadcast({ type: 'update', id, player: players[id] });
+    } 
+    else if (msg.type === 'shoot' && players[id]) {
+      // Gestione sparo
+      console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
 
-// Controllo ogni 100ms
+      const weapon = WEAPONS[msg.weapon] || WEAPONS[players[id].weapon];
+      bullets.push({
+        x: players[id].x,
+        y: players[id].y,
+        dx: Math.cos(msg.angle) * weapon.speed,
+        dy: Math.sin(msg.angle) * weapon.speed,
+        owner: id,
+        life: weapon.range / weapon.speed,
+        damage: weapon.damage
+      });
+    }
+    else if (msg.type === 'respawn' && players[id]) {
+      // Gestione respawn
+      players[id].hp = 100;
+      players[id].isAlive = true;
+      players[id].x = Math.random() * MAP_WIDTH;
+      players[id].y = Math.random() * MAP_HEIGHT;
+      players[id].ammo = { pistol: 15, shotgun: 5 }; // Ricarica munizioni
+      
+      broadcast({ type: 'respawned', id, player: players[id] });
+    }
+  });
+  
+  // Gestione disconnessione
+  socket.on('close', () => {
+    delete players[id];
+    broadcast({ type: 'remove', id });
+  });
+});
+
+// =============== TIMER E INTERVALLI ===============
+// Aggiorna lo stato dei proiettili e delle collisioni
+setInterval(updateBullets, 1000 / 30); // 30 fps
+
+// Controlla pickup di munizioni
 setInterval(checkAmmoPickup, 300);
 
-// Spawn ogni 30 secondi
+// Genera nuove munizioni
 setInterval(() => {
     spawnAmmo('pistol');
     spawnAmmo('shotgun');
-}, 15000);
+}, 15000); // Ogni 15 secondi
 
-setInterval(updateBullets, 1000 / 30);
-
-// 3) Avvia tutto su porta 10000
+// =============== AVVIO SERVER ===============
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Game running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Game server running on port ${PORT}`));
