@@ -90,18 +90,14 @@ wss.on('connection', socket => {
       
     }
     else if (msg.type === 'respawn' && players[id]) {
-    console.log(`[SERVER] Respawn richiesto per il giocatore con ID: ${id}`);
     players[id].hp = 100;
     players[id].isAlive = true;
     players[id].x = Math.random() * 3000;
     players[id].y = Math.random() * 3000;
     players[id].ammo = { pistol: 15, shotgun: 5 }; // Ricarica le munizioni
-    console.log(`[SERVER] Giocatore rigenerato:`, players[id]);
     
     // Controlliamo che broadcast funzioni
-    console.log(`[SERVER] Inviando messaggio di 'respawned' al client con ID: ${id}`);
     broadcast({ type: 'respawned', id, player: players[id] });
-    console.log(`[SERVER] Messaggio 'respawned' inviato correttamente.`);
 }
 
 

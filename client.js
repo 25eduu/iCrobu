@@ -248,10 +248,11 @@ function gameLoop() {
         // 🔄 Disegna i giocatori con offset di camera
         for (let id in players) {
             const p = players[id];
-            if (p.x > offsetX - 50 && p.x < offsetX + canvas.width + 50 &&
+            if (p.isAlive && 
+                p.x > offsetX - 50 && p.x < offsetX + canvas.width + 50 &&
                 p.y > offsetY - 50 && p.y < offsetY + canvas.height + 50) {
                 drawPlayer(p, id === myId, offsetX, offsetY);
-            }
+    }
         }
 
         // 🔄 Disegna i proiettili con offset di camera
@@ -358,16 +359,16 @@ socket.onmessage = event => {
             updateKillCounter();
         }
     } else if (msg.type === 'died') {
-        console.log("myId:", myId, "msg.id:", msg.id);
+
+        if (players[msg.id]) {
+        players[msg.id].isAlive = false;
+        }
         // Mostra schermata di morte se il giocatore è morto
         if (Number(msg.id) === myId) {
             gameStarted = false;    
             deathScreen.classList.remove("hidden");
         }   
     } else if (msg.type === 'respawned') {
-        console.log("✅ Messaggio di respawn ricevuto:", msg);
-        console.log("myId:", myId, "msg.id:", msg.id);
-
         if (Number(msg.id) === myId) {
             console.log("🔄 Sono io il giocatore respawnato!");
             gameStarted = true;
