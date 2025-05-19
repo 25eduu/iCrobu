@@ -4,6 +4,10 @@ const app = express();
 const http = require('http');
 const WebSocket = require('ws');
 
+const MAP_WIDTH = 3000;
+const MAP_HEIGHT = 3000;
+
+
 // 1) HTTP server con Express
 app.use(express.static(path.join(__dirname))); // serve index.html, client.js, ecc.
 
@@ -16,6 +20,9 @@ let players = {};
 let bullets = [];
 let idCounter = 0;
 
+let pistolAmmoPacks = [];
+let shotgunAmmoPacks = [];
+
 const WEAPONS = {
   pistol: { damage: 10, speed: 8, range: 800 },
   shotgun: { damage: 20, speed: 5, range: 600 }
@@ -26,8 +33,8 @@ wss.on('connection', socket => {
 
   //  🟢 Inizializzazione con dati di base
   players[id] = { 
-    x: 1500, 
-    y: 1500, 
+    x: Math.random() * MAP_WIDTH, 
+    y: Math.random() * MAP_HEIGHT, 
     hp: 100, 
     nickname: 'Player' + id, 
     weapon: 'pistol',
@@ -56,12 +63,12 @@ wss.on('connection', socket => {
     }
 
     // 🔄 Cambio arma
-    if (msg.type === 'changeWeapon' && WEAPONS[msg.weapon]) {
+    else if (msg.type === 'changeWeapon' && WEAPONS[msg.weapon]) {
       players[id].weapon = msg.weapon;
       broadcast({ type: 'update', id, player: players[id] });
     }
 
-    if (msg.type === 'move' && players[id]) {
+    else if (msg.type === 'move' && players[id]) {
       players[id].x = msg.x;
       players[id].y = msg.y;
       broadcast({ type: 'update', id, player: players[id] });
@@ -82,6 +89,22 @@ wss.on('connection', socket => {
       });
       
     }
+    else if (msg.type === 'respawn' && players[id]) {
+    console.log(`[SERVER] Respawn richiesto per il giocatore con ID: ${id}`);
+    players[id].hp = 100;
+    players[id].isAlive = true;
+    players[id].x = Math.random() * 3000;
+    players[id].y = Math.random() * 3000;
+    players[id].ammo = { pistol: 15, shotgun: 5 }; // Ricarica le munizioni
+    console.log(`[SERVER] Giocatore rigenerato:`, players[id]);
+    
+    // Controlliamo che broadcast funzioni
+    console.log(`[SERVER] Inviando messaggio di 'respawned' al client con ID: ${id}`);
+    broadcast({ type: 'respawned', id, player: players[id] });
+    console.log(`[SERVER] Messaggio 'respawned' inviato correttamente.`);
+}
+
+
 
   });
   
@@ -94,7 +117,13 @@ wss.on('connection', socket => {
 function broadcast(o) {
   const s = JSON.stringify(o);
   wss.clients.forEach(c => {
-    if (c.readyState === WebSocket.OPEN) c.send(s);
+    if (c.readyState === WebSocket.OPEN) {
+      try {
+        c.send(s);
+      } catch (e) {
+        console.error(`Errore nell'invio del messaggio: ${e.message}`);
+      }
+    }
   });
 }
 
@@ -115,8 +144,6 @@ function updateBullets() {
             p.isAlive = false;
             broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
             broadcast({ type: 'died', id: pid });
-            delete players[pid];
-            broadcast({ type: 'remove', id: pid });
           } else {
             broadcast({ type: 'update', id: pid, player: p });
           }
@@ -128,6 +155,73 @@ function updateBullets() {
   bullets = bullets.filter(b => b.life > 0);
   broadcast({ type: 'bullets', bullets });
 }
+
+function spawnAmmo(type) {
+    const ammoPack = {
+        id: Math.random().toString(36).substring(2, 9),
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        type: type
+    };
+
+    if (type === 'pistol') {
+        pistolAmmoPacks.push(ammoPack);
+    } else if (type === 'shotgun') {
+        shotgunAmmoPacks.push(ammoPack);
+    }
+
+    // 🔄 Invia l'aggiornamento ai client
+    broadcast({
+        type: 'ammo_spawn',
+        ammoPack
+    });
+}
+
+function checkAmmoPickup() {
+    for (let id in players) {
+        const player = players[id];
+
+        if (player.isAlive) {
+            // Controllo munizioni pistola
+            pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
+                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
+                    // Incrementa le munizioni sul client
+                    broadcast({ 
+                        type: 'ammo_pickup', 
+                        playerId: id, 
+                        weapon: 'pistol',
+                        amount: 10  // Puoi decidere il valore che preferisci
+                    });
+                    return false; // Rimuove l'oggetto dall'array
+                }
+                return true;
+            });
+
+            // Controllo munizioni fucile a pompa
+            shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
+                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
+                    broadcast({ 
+                        type: 'ammo_pickup', 
+                        playerId: id, 
+                        weapon: 'shotgun',
+                        amount: 5
+                    });
+                    return false;
+                }
+                return true;
+            });
+        }
+    }
+}
+
+// Controllo ogni 100ms
+setInterval(checkAmmoPickup, 300);
+
+// Spawn ogni 30 secondi
+setInterval(() => {
+    spawnAmmo('pistol');
+    spawnAmmo('shotgun');
+}, 15000);
 
 setInterval(updateBullets, 1000 / 30);
 

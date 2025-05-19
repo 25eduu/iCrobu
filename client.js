@@ -3,6 +3,8 @@ const ctx = canvas.getContext('2d');
 const socket = new WebSocket('wss://zombsroyale.onrender.com');
 const MAP_WIDTH = 3000; // Larghezza totale della mappa
 const MAP_HEIGHT = 3000; // Altezza totale della mappa
+const deathScreen = document.getElementById("deathScreen");
+const respawnButton = document.getElementById("respawnButton");
 
 //Caricamento immagini
 const mappaSVG = new Image();
@@ -17,7 +19,11 @@ shotgunSVG.src = 'img/rifle_character.svg';
 const bulletImage = new Image();
 bulletImage.src = 'img/bullet.png';
 
+const pistolAmmoImg = new Image();
+pistolAmmoImg.src = 'img/rifle.png';
 
+const shotgunAmmoImg = new Image();
+shotgunAmmoImg.src = 'img/shotgun.png';
 
 let players = {};
 let bullets = [];
@@ -27,6 +33,9 @@ let gameStarted = false;
 let isLoggedIn = false;
 let selectedWeapon = "pistol";
 let killCount = 0;
+
+let pistolAmmoPacks = [];
+let shotgunAmmoPacks = [];
 
 const keys = {};
 let mouse = { x: 0, y: 0 };
@@ -70,14 +79,19 @@ function updateMinimap(players) {
         }
         minimapCtx.fillRect(p.x * SCALE, p.y * SCALE, 5, 5);
     }
+
+    // Munizioni Pistola
+    minimapCtx.fillStyle = 'yellow';
+    pistolAmmoPacks.forEach(pack => {
+        minimapCtx.fillRect(pack.x * SCALE, pack.y * SCALE, 3, 3);
+    });
+
+    // Munizioni Fucile a Pompa
+    minimapCtx.fillStyle = 'orange';
+    shotgunAmmoPacks.forEach(pack => {
+        minimapCtx.fillRect(pack.x * SCALE, pack.y * SCALE, 3, 3);
+    });
 }
-
-
-// Respawn button event listener
-/*document.getElementById('respawnButton').addEventListener('click', () => {
-    deathScreen.style.display = 'none';
-    showLoginScreen();
-});*/
 
 // Initialize kill counter div and death screen as hidden
 killCounterDiv.style.display = 'none';
@@ -166,14 +180,22 @@ function drawPlayer(player, isSelf = false, offsetX = 0, offsetY = 0) {
     const sprite = player.weapon === "pistol" ? pistolSVG : shotgunSVG;
 
     // 🔄 Calcolo delle coordinate effettive di disegno sul canvas
-    let drawX = canvas.width / 2;
-    let drawY = canvas.height / 2;
+    if (isSelf) {
+        // 🎯 Giocatore Locale — Sempre al centro
+        drawX = canvas.width / 2;
+        drawY = canvas.height / 2;
 
-    // Compensazione ai bordi
-    if (players[myId].x < canvas.width / 2) drawX = players[myId].x;
-    if (players[myId].y < canvas.height / 2) drawY = players[myId].y;
-    if (players[myId].x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - players[myId].x);
-    if (players[myId].y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - players[myId].y);
+        // Compensazione ai bordi
+        if (players[myId].x < canvas.width / 2) drawX = players[myId].x;
+        if (players[myId].y < canvas.height / 2) drawY = players[myId].y;
+        if (players[myId].x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - players[myId].x);
+        if (players[myId].y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - players[myId].y);
+
+    } else {
+        // 🔎 Giocatori Remoti — In base all'offset di telecamera
+        drawX = player.x - offsetX;
+        drawY = player.y - offsetY;
+    }
 
     // 🔄 Calcolo dell'angolo corretto rispetto al mouse
     const angle = Math.atan2(mouse.y - drawY, mouse.x - drawX);
@@ -200,16 +222,6 @@ function drawPlayer(player, isSelf = false, offsetX = 0, offsetY = 0) {
     // ❤️ HP sotto il nickname
     ctx.fillText(player.hp + " HP", drawX, drawY + 50);
 }
-
-
-
-
-
-
-
-
-
-
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -250,11 +262,73 @@ function gameLoop() {
             }
         }
 
+        drawAmmoPacks(offsetX, offsetY);
+        checkAmmoPickup();
+
         // 🔄 Aggiorna la minimappa
         updateMinimap(players);
+        
     }
 
     requestAnimationFrame(gameLoop);
+}
+
+function checkAmmoPickup() {
+    const me = players[myId];
+
+    // Pistola
+    pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
+        const distance = Math.hypot(me.x - pack.x, me.y - pack.y);
+        if (distance < 20) {
+            ammo.pistol += 10; // Aggiunge 10 colpi
+            updateWeaponUI();
+            return false; // Rimuove il pacco
+        }
+        return true;
+    });
+
+    // Fucile a Pompa
+    shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
+        const distance = Math.hypot(me.x - pack.x, me.y - pack.y);
+        if (distance < 20) {
+            ammo.shotgun += 5; // Aggiunge 5 colpi
+            updateWeaponUI();
+            return false;
+        }
+        return true;
+    });
+}
+
+function spawnAmmo(type) {
+    const ammoPack = {
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        type: type
+    };
+    if (type === 'pistol') {
+        pistolAmmoPacks.push(ammoPack);
+    } else if (type === 'shotgun') {
+        shotgunAmmoPacks.push(ammoPack);
+    }
+}
+
+// Spawn ogni 30 secondi
+setInterval(() => {
+    spawnAmmo('pistol');
+    spawnAmmo('shotgun');
+}, 15000);
+
+function drawAmmoPacks(offsetX = 0, offsetY = 0) {
+     const size = 40; // Imposta la dimensione dell'immagine
+    // Munizioni Pistola
+    pistolAmmoPacks.forEach(pack => {
+       ctx.drawImage(pistolAmmoImg,pack.x - offsetX - size / 2,pack.y - offsetY - size / 2,size,size);
+    });
+
+    // Munizioni Fucile a Pompa
+    shotgunAmmoPacks.forEach(pack => {
+        ctx.drawImage(shotgunAmmoImg,pack.x - offsetX - size / 2,pack.y - offsetY - size / 2,size,size);
+    });
 }
 
 function drawBullet(bullet, offsetX = 0, offsetY = 0) {
@@ -284,13 +358,29 @@ socket.onmessage = event => {
             updateKillCounter();
         }
     } else if (msg.type === 'died') {
+        console.log("myId:", myId, "msg.id:", msg.id);
         // Mostra schermata di morte se il giocatore è morto
-        if (msg.id === myId) {
-            gameStarted = false;
-            document.getElementById('finalKills').textContent = killCount;
-            killCounterDiv.style.display = 'none';
+        if (Number(msg.id) === myId) {
+            gameStarted = false;    
+            deathScreen.classList.remove("hidden");
+        }   
+    } else if (msg.type === 'respawned') {
+        console.log("✅ Messaggio di respawn ricevuto:", msg);
+        console.log("myId:", myId, "msg.id:", msg.id);
+
+        if (Number(msg.id) === myId) {
+            console.log("🔄 Sono io il giocatore respawnato!");
+            gameStarted = true;
+            deathScreen.classList.add("hidden");
+            players[myId] = msg.player;
+            document.getElementById('game').style.filter = "none";
+            updateMinimap(players);
+        } else {
+            console.log("❌ Il messaggio di respawn non è per me.");
         }
     }
+
+
 };
 
 // Variabili globali
@@ -298,6 +388,19 @@ let ammo = {
     pistol: 15,
     shotgun: 5
 };
+
+respawnButton.addEventListener("click", () => {
+    console.log("Tentativo di respawn...");
+    socket.send(JSON.stringify({ type: 'respawn', id: myId }));
+    console.log("Messaggio di respawn inviato al server");
+
+    // Controlliamo se rimuove correttamente la schermata di morte
+    deathScreen.classList.add("hidden");
+    console.log("Schermata di morte nascosta");
+
+    // Controlliamo se il client aggiorna lo stato
+    console.log("Gioco ripartito:", gameStarted);
+});
 
 // Ascolta i click sulla barra
 document.getElementById('pistol').addEventListener('click', () => {
