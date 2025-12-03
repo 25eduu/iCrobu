@@ -3,35 +3,94 @@ const path = require("path");
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
-// NUOVO: Importazione del modulo sqlite3
-const sqlite3 = require("sqlite3").verbose();
-const { open } = require("sqlite"); // Usiamo la versione con Promise per codice più pulito
 
-// =============== CONFIGURAZIONE DB ===============
-const DB_FILE = path.join(__dirname, "chat.db");
-let db; 
+// NUOVE DIPENDENZE PER DATABASE E SICUREZZA
+const { Pool } = require('pg'); // Client PostgreSQL
+const bcrypt = require("bcryptjs"); // Hashing delle password
+require('dotenv').config(); // Carica variabili d'ambiente (come DATABASE_URL)
 
 // =============== SERVER SETUP ===============
 const app = express();
 const server = http.createServer(app);
-// Aumenta la dimensione massima del payload per gestire i file Base64 (es. 10MB)
-const wss = new WebSocket.Server({ server, maxPayload: 10 * 1024 * 1024 }); 
+const wss = new WebSocket.Server({ server, maxPayload: 10 * 1024 * 1024 }); // Aumenta payload per file
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 
+// =============== DATABASE POSTGRESQL SETUP ===============
+const SALT_ROUNDS = 10; 
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // Configurazione SSL necessaria per Render
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+/** Inizializza il DB e crea la tabella 'users' se non esiste. */
+async function initializeDB() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                nickname VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL 
+            );
+        `);
+        console.log("Tabella 'users' verificata o creata con successo.");
+    } catch (err) {
+        console.error("❌ Errore durante l'inizializzazione del DB:", err);
+        process.exit(1);
+    }
+}
+
+/** Controlla le credenziali di accesso. Restituisce il nickname se login ok. */
+async function checkLogin(nickname, password) {
+    const result = await pool.query('SELECT nickname, password_hash FROM users WHERE nickname = $1', [nickname]);
+    
+    if (result.rows.length === 0) return null; // Utente non trovato
+
+    const user = result.rows[0];
+    // Confronta la password fornita con l'hash salvato
+    if (await bcrypt.compare(password, user.password_hash)) {
+        return user.nickname; // Login OK
+    }
+    return null; // Password errata
+}
+
+/** Aggiunge un nuovo utente al DB con password hashata. */
+async function addUser(nickname, password) {
+    // Genera l'hash della password
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS); 
+    
+    try {
+        await pool.query('INSERT INTO users (nickname, password_hash) VALUES ($1, $2)', [nickname, passwordHash]);
+        return true;
+    } catch (error) {
+        // Codice errore 23505 è per violazione di chiave unica (nickname già esistente)
+        if (error.code === '23505') return false; 
+        throw error; // Rilancia altri errori DB
+    }
+}
+
+/** Controlla se un nickname esiste nel DB. */
+async function userExists(nickname) {
+    const result = await pool.query('SELECT 1 FROM users WHERE nickname = $1', [nickname]);
+    return result.rows.length > 0;
+}
+
+
 // =============== DATI SERVER (in RAM) ===============
-// users[tempConnectionId] = { socket, nickname: "...", status: 'connected' };
+// users[tempConnectionId] = { socket, nickname: "..." };
 let users = {}; 
 let nextTempId = 1; // ID temporaneo per l'oggetto socket in RAM
 const MAX_MESSAGE_LENGTH = 65536; 
 
-function checkMessageLength(text) {
-    if (typeof text !== 'string') return false; 
-    return text.length <= MAX_MESSAGE_LENGTH;
+function checkMessageLength(data) {
+    // Controlla la lunghezza del payload JSON serializzato (messaggio + file)
+    return JSON.stringify(data).length <= MAX_MESSAGE_LENGTH * 1.5; 
 }
 
-// NUOVO: Funzione per trovare il TEMPORARY ID a partire dal nickname
+// Funzione per trovare il TEMPORARY ID a partire dal nickname
 function getTempIdByNickname(nickname) {
     for (const tempId in users) {
         if (users[tempId].nickname === nickname) {
@@ -40,6 +99,14 @@ function getTempIdByNickname(nickname) {
     }
     return null;
 }
+
+// Ottiene la lista degli utenti online (escluso l'utente corrente)
+function getOnlineUsersList(currentNickname) {
+    return Object.keys(users)
+        .filter(tid => users[tid].nickname && users[tid].nickname !== currentNickname)
+        .map(tid => ({ id: users[tid].nickname, nickname: users[tid].nickname }));
+}
+
 
 // =============== FUNZIONE BROADCAST ===============
 function broadcast(message, excludeTempId = null) {
@@ -53,40 +120,6 @@ function broadcast(message, excludeTempId = null) {
     });
 }
 
-// =============== FUNZIONI ASINCRONE DB ===============
-
-/** Controlla se un nickname esiste nel DB. */
-async function userExists(nickname) {
-    const user = await db.get("SELECT nickname FROM users WHERE nickname = ?", nickname);
-    return !!user;
-}
-
-/** Controlla le credenziali di accesso. Restituisce il nickname se login ok. */
-async function checkLogin(nickname, password) {
-    const user = await db.get("SELECT nickname FROM users WHERE nickname = ? AND password = ?", nickname, password);
-    return user ? user.nickname : null;
-}
-
-/** Aggiunge un nuovo utente al DB. */
-async function addUser(nickname, password) {
-    await db.run("INSERT INTO users (nickname, password) VALUES (?, ?)", nickname, password);
-}
-
-
-// =============== INIZIALIZZAZIONE DB ===============
-async function initializeDB() {
-    db = await open({
-        filename: DB_FILE,
-        driver: sqlite3.Database
-    });
-
-    await db.run(
-        "CREATE TABLE IF NOT EXISTS users (nickname TEXT PRIMARY KEY, password TEXT NOT NULL)"
-    );
-    console.log("Database SQLite pronto e connesso. Nickname usato come Primary Key.");
-}
-
-
 // =============== WEBSOCKET HANDLING ===============
 wss.on("connection", socket => {
     const tempId = nextTempId++;
@@ -96,52 +129,64 @@ wss.on("connection", socket => {
 
     socket.on("message", async data => { 
         let msg;
-        try { msg = JSON.parse(data); } catch (e) { return; }
+        try { msg = JSON.parse(data.toString()); } catch (e) { return; }
 
-        // ----- LOGIN / REGISTRAZIONE -----
+        // ----- LOGIN / REGISTRAZIONE (ASINCRONO) -----
         
         if (msg.type === "login") {
             try {
                 const loggedInNickname = await checkLogin(msg.nickname, msg.password);
                 if (loggedInNickname) {
+                    
+                    // Verifica se l'utente è già connesso
+                    const alreadyLoggedIn = Object.values(users).some(u => u.nickname === loggedInNickname && Number(Object.keys(users).find(key => users[key].socket === u.socket)) !== tempId);
+                    if (alreadyLoggedIn) {
+                        socket.send(JSON.stringify({ type: "login_fail", reason: "Utente già connesso." }));
+                        return;
+                    }
+
                     users[tempId].nickname = loggedInNickname;
                     users[tempId].status = 'connected';
                     
                     socket.send(JSON.stringify({ type: "login_success", nickname: loggedInNickname })); 
 
-                    const onlineUsers = Object.keys(users)
-                        .filter(tid => users[tid].nickname && users[tid].nickname !== loggedInNickname) 
-                        .map(tid => ({ id: users[tid].nickname, nickname: users[tid].nickname })); 
-                    socket.send(JSON.stringify({ type: "online_users", users: onlineUsers }));
+                    // Invia la lista degli online solo a questo utente
+                    socket.send(JSON.stringify({ 
+                        type: "online_users", 
+                        users: getOnlineUsersList(loggedInNickname) 
+                    }));
                     
+                    // Notifica gli altri
                     broadcast({ type: "user_joined", id: loggedInNickname, nickname: loggedInNickname }, tempId);
                 } else {
-                    socket.send(JSON.stringify({ type: "login_fail" }));
+                    socket.send(JSON.stringify({ type: "login_fail", reason: "Nickname o password errati." }));
                 }
             } catch (error) {
                 console.error("Errore DB durante il login:", error);
-                socket.send(JSON.stringify({ type: "login_fail" }));
+                socket.send(JSON.stringify({ type: "login_fail", reason: "Errore interno del server." }));
             }
         }
 
         if (msg.type === "register") {
             try {
-                if (await userExists(msg.nickname)) {
-                    socket.send(JSON.stringify({ type: "register_fail", reason: "Nickname già esistente" }));
-                } else {
-                    await addUser(msg.nickname, msg.password); 
-                    
+                const success = await addUser(msg.nickname, msg.password);
+                
+                if (success) {
+                    // Login automatico
                     users[tempId].nickname = msg.nickname;
                     users[tempId].status = 'connected';
 
                     socket.send(JSON.stringify({ type: "register_success", nickname: msg.nickname })); 
 
-                    const onlineUsers = Object.keys(users)
-                        .filter(tid => users[tid].nickname && users[tid].nickname !== msg.nickname)
-                        .map(tid => ({ id: users[tid].nickname, nickname: users[tid].nickname }));
-                    socket.send(JSON.stringify({ type: "online_users", users: onlineUsers }));
+                    // Invia la lista degli online solo a questo utente
+                    socket.send(JSON.stringify({ 
+                        type: "online_users", 
+                        users: getOnlineUsersList(msg.nickname) 
+                    }));
 
                     broadcast({ type: "user_joined", id: msg.nickname, nickname: msg.nickname }, tempId);
+                } else {
+                    socket.send(JSON.stringify({ type: "register_fail", reason: "Nickname già esistente." }));
                 }
             } catch (error) {
                 console.error("Errore DB durante la registrazione:", error);
@@ -155,27 +200,23 @@ wss.on("connection", socket => {
         // ----- CHAT GENERALE (CON GESTIONE FILE) -----
         if (msg.type === "channel_message") {
             const text = msg.text || "";
-            const file = msg.file;
+            const file = msg.file; // Il campo file contiene dati Base64
 
             if (!text && !file) return; 
-
-            if (!checkMessageLength(text)) {
-                console.log(`[AVVISO SICUREZZA] Messaggio troppo lungo (channel).`);
+            
+            // Controllo dimensione/struttura del payload totale
+            if (!checkMessageLength(msg)) {
+                console.log(`[AVVISO SICUREZZA] Utente ${senderNickname} ha tentato di inviare un payload troppo grande (channel).`);
                 return; 
-            }
-            // Controllo dimensione/struttura del file Base64 (max 5MB)
-            if (file && (typeof file.base64 !== 'string' || file.base64.length > 5 * 1024 * 1024 * 1.4)) { 
-                console.log(`[AVVISO SICUREZZA] Dati file non validi o troppo grandi (channel).`);
-                return;
             }
 
             broadcast({ 
                 type: "channel_message", 
                 message: { 
-                    id: senderNickname, 
+                    id: senderNickname, // Usiamo il nickname come ID
                     nickname: senderNickname, 
                     text: text, 
-                    file: file // INOLTRA IL CAMPO FILE
+                    file: file
                 } 
             });
         }
@@ -187,19 +228,17 @@ wss.on("connection", socket => {
 
             if (!text && !file) return; 
 
-            if (!checkMessageLength(text)) {
-                console.log(`[AVVISO SICUREZZA] Messaggio troppo lungo (dm).`);
+            // Controllo dimensione/struttura del payload totale
+            if (!checkMessageLength(msg)) {
+                console.log(`[AVVISO SICUREZZA] Utente ${senderNickname} ha tentato di inviare un payload troppo grande (dm).`);
                 return; 
-            }
-            if (file && (typeof file.base64 !== 'string' || file.base64.length > 5 * 1024 * 1024 * 1.4)) {
-                console.log(`[AVVISO SICUREZZA] Dati file non validi o troppo grandi (dm).`);
-                return;
             }
 
             const receiverNickname = msg.to; 
             const receiverTempId = getTempIdByNickname(receiverNickname); 
             const receiver = users[receiverTempId];
             
+            // Non inviare se il destinatario non è online o è l'utente stesso
             if (!receiver || receiverTempId === tempId) return; 
 
             const payload = { 
@@ -209,10 +248,11 @@ wss.on("connection", socket => {
                     to: receiverNickname, 
                     nickname: senderNickname, 
                     text: text, 
-                    file: file // INOLTRA IL CAMPO FILE
+                    file: file
                 } 
             };
             
+            // Invia al destinatario e a se stesso
             receiver.socket.send(JSON.stringify(payload));
             users[tempId].socket.send(JSON.stringify(payload));
         }
@@ -230,10 +270,12 @@ wss.on("connection", socket => {
 // =============== AVVIO SERVER ===============
 const PORT = process.env.PORT || 10000;
 
+// Prima di avviare il server, inizializza il DB in modo asincrono
 initializeDB().then(() => {
     server.listen(PORT, () => {
         console.log(`Server avviato su http://localhost:${PORT}`);
     });
 }).catch(err => {
     console.error("Impossibile avviare il server a causa di un errore DB:", err);
+    process.exit(1);
 });

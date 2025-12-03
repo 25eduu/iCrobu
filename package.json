@@ -20,6 +20,7 @@
   "description": "",
   "dependencies": {
     "express": "^5.1.0",
+    "pg": "^8.16.3",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "ws": "^8.18.2"

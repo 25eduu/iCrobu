@@ -1,7 +1,10 @@
 console.log("client.js caricato");
 
-// WebSocket
-const socket = new WebSocket("ws://localhost:10000");
+// =================================== WEBSOCKET CONNECTION ===================================
+// Usa una connessione dinamica (wss se HTTPS, ws se HTTP) per la compatibilità con Render/prod
+const host = "icrobu.onrender.com"; 
+const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const socket = new WebSocket(`${protocol}//${host}/`);
 
 // =================================== DOM REFERENCES ===================================
 const loginScreen = document.getElementById("loginScreen");
@@ -32,10 +35,7 @@ const chatHeader = document.getElementById("chatHeader");
 const profilePic = document.getElementById("profilePic"); 
 const chattingWithName = document.getElementById("chattingWithName"); 
 
-// NUOVI RIFERIMENTI PER LA MODALE
-const imageModal = document.getElementById("imageModal");
-const imageModalContent = document.getElementById("imageModalContent");
-const closeModal = document.querySelector(".close-modal");
+// Riferimenti Modale RIMOSSI
 
 // =================================== DATA & CONFIG ===================================
 let nickname = null; 
@@ -150,14 +150,14 @@ function renderMessages() {
             contentHTML += `<div class="msg-content">`;
             
             if (m.file.type && m.file.type.startsWith('image/')) {
-                // Visualizza come Immagine (anteprima)
-                contentHTML += `<img src="${m.file.base64}" alt="${m.file.name}" class="attached-image clickable-image">`;
+                // Visualizza come Immagine (anteprima), rimosso 'clickable-image'
+                contentHTML += `<img src="${m.file.base64}" alt="${m.file.name}" class="attached-image">`;
                 
             } else {
                 // Visualizza come File linkabile
                 contentHTML += `<a href="${m.file.base64}" download="${m.file.name}" class="attached-file">
-                                         💾 ${m.file.name}
-                                     </a>`;
+                                    💾 ${m.file.name}
+                                </a>`;
             }
 
             // Aggiunge il testo sotto l'allegato, se presente
@@ -175,25 +175,32 @@ function renderMessages() {
     });
     
     messages.scrollTop = messages.scrollHeight;
-    attachImageClickHandlers(); 
+    // Rimosso: attachImageClickHandlers();
 }
+
+// Logica Modale RIMOSSA: function attachImageClickHandlers() {}
 
 
 // =================================== EVENT HANDLERS ===================================
 
 // LOGICA OCCHIOLINO
-if (togglePassword) {
+if (passwordInput && togglePassword) {
+    // Inizialmente l'occhio è nascosto/impostato su 'password'
     togglePassword.classList.add('hidden'); 
+    passwordInput.addEventListener('input', () => {
+         if (passwordInput.value.length > 0) {
+            togglePassword.style.display = 'block';
+         } else {
+            togglePassword.style.display = 'none';
+         }
+    });
+
     togglePassword.onclick = () => {
         const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
         passwordInput.setAttribute('type', type);
-        if (type === 'text') {
-            togglePassword.classList.remove('hidden');
-            togglePassword.classList.add('visible'); 
-        } else {
-            togglePassword.classList.remove('visible');
-            togglePassword.classList.add('hidden'); 
-        }
+        // Cambia l'icona
+        togglePassword.classList.toggle('hidden', type === 'password');
+        togglePassword.classList.toggle('visible', type === 'text');
     };
 }
 
@@ -331,11 +338,13 @@ if(removeAttachmentButton) {
     removeAttachmentButton.onclick = clearAttachment;
 }
 
+// Logica Modale: Chiusura RIMOSSA
 
 // =================================== SOCKET ONMESSAGE ===================================
 socket.onmessage = e => {
     const msg = JSON.parse(e.data);
     
+    // Login/Registrazione
     if (msg.type === "login_success" || msg.type === "register_success") {
         nickname = msg.nickname; 
         loginScreen.style.display = "none";
@@ -349,9 +358,10 @@ socket.onmessage = e => {
         renderChatHeader(); 
         renderMessages();
     }
-    if (msg.type === "login_fail") alert("Login fallito: nickname o password errati");
+    if (msg.type === "login_fail") alert("Login fallito: " + (msg.reason || "nickname o password errati"));
     if (msg.type === "register_fail") alert("Registrazione fallita: " + msg.reason);
 
+    // Utenti Online
     if (msg.type === "online_users") {
         onlineUsers = {}; 
         msg.users.forEach(user => {
@@ -360,6 +370,7 @@ socket.onmessage = e => {
         renderChatList();
     }
     
+    // Entrata/Uscita Utente
     if (msg.type === "user_joined") {
         onlineUsers[msg.id] = { id: msg.id, nickname: msg.nickname };
         renderChatList();
@@ -378,8 +389,10 @@ socket.onmessage = e => {
     // MESSAGGIO CHANNEL (Riceve il campo 'file')
     if (msg.type === "channel_message") {
         const m = msg.message;
-        const isMe = m.id === nickname; 
+        const isMe = m.nickname === nickname; 
         
+        if (!conversations.general) conversations.general = [];
+
         m.read = isMe || (currentChat === "general"); 
         conversations.general.push(m);
         
@@ -401,85 +414,6 @@ socket.onmessage = e => {
         m.read = isMe || (currentChat === peer); 
         conversations[peer].push(m);
         
-        if (!onlineUsers[peer]) {
-            onlineUsers[peer] = { id: peer, nickname: m.nickname };
-        }
-        
-        renderChatList();
-        if (currentChat === peer) renderMessages();
-    }
-};
-
-// SOCKET ONMESSAGE (Logica di ricezione messaggi)
-socket.onmessage = e => {
-    const msg = JSON.parse(e.data);
-    
-    if (msg.type === "login_success" || msg.type === "register_success") {
-        nickname = msg.nickname; 
-        loginScreen.style.display = "none";
-        conversations.general = []; 
-        currentChat = "general";
-        
-        renderChatList();
-        const generalItem = document.querySelector(`.chatItem[data-id="general"]`);
-        if(generalItem) generalItem.classList.add('active');
-        
-        renderChatHeader(); 
-        renderMessages();
-    }
-    if (msg.type === "login_fail") alert("Login fallito: nickname o password errati");
-    if (msg.type === "register_fail") alert("Registrazione fallita: " + msg.reason);
-
-    if (msg.type === "online_users") {
-        onlineUsers = {}; 
-        msg.users.forEach(user => {
-            onlineUsers[user.id] = user; 
-        });
-        renderChatList();
-    }
-    
-    if (msg.type === "user_joined") {
-        onlineUsers[msg.id] = { id: msg.id, nickname: msg.nickname };
-        renderChatList();
-    }
-
-    if (msg.type === "user_left") {
-        delete onlineUsers[msg.id];
-        if (currentChat === msg.id) { 
-            currentChat = 'general';
-            renderChatHeader(); 
-            renderMessages();
-        }
-        renderChatList();
-    }
-
-    // MESSAGGIO CHANNEL (Riceve il campo 'file')
-    if (msg.type === "channel_message") {
-        const m = msg.message;
-        const isMe = m.id === nickname; 
-        
-        m.read = isMe || (currentChat === "general"); 
-        conversations.general.push(m);
-        
-        if (currentChat === "general") {
-            renderMessages();
-        } else if (!isMe) {
-            renderChatList(); 
-        }
-    }
-
-    // MESSAGGIO DM (Riceve il campo 'file')
-    if (msg.type === "dm") {
-        const m = msg.message;
-        const isMe = m.from === nickname; 
-        const peer = isMe ? m.to : m.from; 
-        
-        if (!conversations[peer]) conversations[peer] = [];
-        
-        m.read = isMe || (currentChat === peer); 
-        conversations[peer].push(m);
-        
-        // Potrebbe essere un DM da un utente che non era nella lista online
         if (!onlineUsers[peer]) {
             onlineUsers[peer] = { id: peer, nickname: m.nickname };
         }
