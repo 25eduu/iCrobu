@@ -19,6 +19,7 @@
   "homepage": "https://github.com/ImSoFrqst/zombsroyale#readme",
   "description": "",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "express": "^5.1.0",
     "pg": "^8.16.3",
     "sqlite": "^5.1.1",
