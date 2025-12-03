@@ -1,459 +1,490 @@
-// =============== CONFIGURAZIONE E COSTANTI ===============
-const MAP_WIDTH = 3000;
-const MAP_HEIGHT = 3000;
+console.log("client.js caricato");
 
-// =============== ELEMENTI DOM ===============
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const deathScreen = document.getElementById("deathScreen");
-const respawnButton = document.getElementById("respawnButton");
+// WebSocket
+const socket = new WebSocket("ws://localhost:10000");
 
-// =============== CONFIGURAZIONE MINIMAPPA ===============
-const minimap = document.createElement('canvas');
-minimap.id = 'minimap';
-minimap.width = 200;
-minimap.height = 200;
-document.body.appendChild(minimap);
-const minimapCtx = minimap.getContext('2d');
-const MINIMAP_SCALE = 0.067; // Ratio per ridimensionamento della minimappa
+// =================================== DOM REFERENCES ===================================
+const loginScreen = document.getElementById("loginScreen");
+const nicknameInput = document.getElementById("nicknameInput");
+const passwordInput = document.getElementById("passwordInput");
+const togglePassword = document.getElementById("togglePassword"); 
 
-// =============== CONFIGURAZIONE CONTATORE UCCISIONI ===============
-const killCounterDiv = document.createElement('div');
-killCounterDiv.id = 'killCounter';
-killCounterDiv.style.position = 'fixed';
-killCounterDiv.style.top = '230px';
-killCounterDiv.style.right = '20px';
-killCounterDiv.style.color = 'white';
-killCounterDiv.style.backgroundColor = 'rgba(44, 48, 54, 0.7)';
-killCounterDiv.style.padding = '10px';
-killCounterDiv.style.borderRadius = '8px';
-killCounterDiv.innerText = `Kills: 0`;
-document.body.appendChild(killCounterDiv);
-killCounterDiv.style.display = 'none';
+const loginButton = document.getElementById("loginButton");
+const registerButton = document.getElementById("registerButton");
 
-// =============== CONNESSIONE WEBSOCKET ===============
-const socket = new WebSocket('wss://zombsroyale.onrender.com');
+const chatList = document.getElementById("chatList");
+const messages = document.getElementById("messages");
+const messageInput = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
 
-// =============== CARICAMENTO IMMAGINI ===============
-// Mappa
-const mappaSVG = new Image();
-mappaSVG.src = 'img/game_map.svg';
+// Riferimenti Allegati
+const attachmentButton = document.getElementById("attachmentButton"); 
+const attachmentInput = document.getElementById("attachmentInput");
 
-// Personaggi
-const pistolSVG = new Image();
-pistolSVG.src = 'img/pistol_character.svg';
-const shotgunSVG = new Image();
-shotgunSVG.src = 'img/rifle_character.svg';
+// Riferimenti Anteprima Input
+const attachmentPreviewContainer = document.getElementById("attachmentPreviewContainer");
+const previewFileName = document.getElementById("previewFileName");
+const removeAttachmentButton = document.getElementById("removeAttachmentButton");
+const imagePreview = document.getElementById("imagePreview");
 
-// Proiettili e oggetti
-const bulletImage = new Image();
-bulletImage.src = 'img/bullet.png';
-const pistolAmmoImg = new Image();
-pistolAmmoImg.src = 'img/rifle.png';
-const shotgunAmmoImg = new Image();
-shotgunAmmoImg.src = 'img/shotgun.png';
+// Elementi per l'header della chat
+const chatHeader = document.getElementById("chatHeader"); 
+const profilePic = document.getElementById("profilePic"); 
+const chattingWithName = document.getElementById("chattingWithName"); 
 
-// =============== STATO DEL GIOCO ===============
-let players = {};
-let bullets = [];
-let myId = null;
-let nickname = null;
-let gameStarted = false;
-let isLoggedIn = false;
-let selectedWeapon = "pistol";
-let killCount = 0;
-let pistolAmmoPacks = [];
-let shotgunAmmoPacks = [];
-let ammo = {
-    pistol: 15,
-    shotgun: 5
-};
+// NUOVI RIFERIMENTI PER LA MODALE
+const imageModal = document.getElementById("imageModal");
+const imageModalContent = document.getElementById("imageModalContent");
+const closeModal = document.querySelector(".close-modal");
 
-// =============== INPUT UTENTE ===============
-const keys = {};
-let mouse = { x: 0, y: 0 };
+// =================================== DATA & CONFIG ===================================
+let nickname = null; 
+let conversations = {}; 
+let currentChat = "general";
+let onlineUsers = {}; 
+const MAX_LENGTH = 65536; 
 
-// =============== EVENT LISTENERS ===============
-// Controlli tastiera e mouse
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
-canvas.addEventListener('mousemove', e => {
-    mouse.x = e.offsetX;
-    mouse.y = e.offsetY;
-});
+// Funzione per ripulire lo stato dell'allegato
+function clearAttachment() {
+    if (!attachmentInput) return;
+    
+    attachmentInput.value = null; 
+    attachmentPreviewContainer.classList.add('hidden');
+    previewFileName.textContent = '';
+    imagePreview.src = '';
+    imagePreview.classList.add('hidden');
+}
 
-// Gestione sparo
-canvas.addEventListener('mousedown', e => {
-    if (gameStarted) {
-        const me = players[myId];
+// =================================== HELPER FUNCTIONS ===================================
 
-        // Calcoliamo la posizione attuale sul canvas
-        let drawX = canvas.width / 2;
-        let drawY = canvas.height / 2;
-
-        // Compensazione ai bordi
-        if (me.x < canvas.width / 2) drawX = me.x;
-        if (me.y < canvas.height / 2) drawY = me.y;
-        if (me.x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - me.x);
-        if (me.y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - me.y);
-
-        // Calcolo dell'angolo rispetto al centro del personaggio sul canvas
-        const angle = Math.atan2(e.clientY - drawY, e.clientX - drawX);
-
-        // Invia il messaggio di sparo al server
-        if (selectedWeapon === "pistol" && ammo.pistol > 0) {
-            ammo.pistol--;
-            socket.send(JSON.stringify({ type: 'shoot', weapon: 'pistol', angle }));
-        } else if (selectedWeapon === "shotgun" && ammo.shotgun > 0) {
-            ammo.shotgun--;
-            socket.send(JSON.stringify({ type: 'shoot', weapon: 'shotgun', angle }));
-        }
+// RENDER SIDEBAR
+function renderChatList() {
+    chatList.innerHTML = "";
+    
+    // 1. CHAT GENERALE (Sempre presente)
+    const generalUnread = conversations.general ? conversations.general.some(m => !m.read) : false;
+    const generalBadge = generalUnread ? `<span class="unread-dot"></span>` : '';
+    
+    chatList.innerHTML += `
+        <div class="chatItem ${currentChat === 'general' ? 'active' : ''}" data-id="general">
+            <b>Chat Generale</b>${generalBadge}
+        </div>
+    `;
+    
+    // 2. CHAT PRIVATE (DM)
+    for (let peerNickname in onlineUsers) { 
+        if (peerNickname === nickname) continue; 
         
-        updateWeaponUI();
-    }
-});
-
-// Gestione pulsante respawn
-respawnButton.addEventListener("click", () => {
-    console.log("Tentativo di respawn...");
-    socket.send(JSON.stringify({ type: 'respawn', id: myId }));
-    console.log("Messaggio di respawn inviato al server");
-
-    // Nascondi schermata di morte
-    deathScreen.classList.add("hidden");
-    console.log("Schermata di morte nascosta");
-
-    // Log stato gioco
-    console.log("Gioco ripartito:", gameStarted);
-});
-
-// Gestione cambio arma
-document.getElementById('pistol').addEventListener('click', () => {
-    selectedWeapon = "pistol";
-    players[myId].weapon = "pistol";
-    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'pistol' }));
-});
-
-document.getElementById('shotgun').addEventListener('click', () => {
-    selectedWeapon = "shotgun";
-    players[myId].weapon = "shotgun";
-    socket.send(JSON.stringify({ type: 'changeWeapon', weapon: 'shotgun' }));
-});
-
-// Gestione pulsante "Gioca"
-document.getElementById('playButton').addEventListener('click', () => {
-    const nicknameInput = document.getElementById('nicknameInput');
-    const startScreen = document.getElementById('startScreen');
-    
-    isLoggedIn = true;
-    nickname = nicknameInput.value.trim();
-    const minLength = 3;
-    const maxLength = 16;
-    const nicknameRegex = /^[a-zA-Z0-9_]+$/; // Solo lettere, numeri e underscore
-    
-    if (nickname.length < minLength || nickname.length > maxLength) {
-        alert(`Il nickname deve essere tra ${minLength} e ${maxLength} caratteri.`);
-        return;
-    }
-    
-    if (!nicknameRegex.test(nickname)) {
-        alert("Il nickname può contenere solo lettere, numeri e underscore (_).");
-        return;
-    }
-    
-    // Nascondi schermata di login
-    if (startScreen) {
-        startScreen.style.display = 'none';
-    }
-    
-    gameStarted = true;
-    
-    // Mostra elementi di gioco
-    killCounterDiv.style.display = 'block';
-    
-    // Log per vedere cosa viene inviato
-    console.log('Invio nickname al server:', nickname);
-    
-    // Invia al server il nickname
-    socket.send(JSON.stringify({ type: 'join', nickname }));
-});
-
-// =============== GESTIONE MESSAGGI WEBSOCKET ===============
-socket.onmessage = event => {
-    const msg = JSON.parse(event.data);
-
-    if (msg.type === 'init') {
-        myId = msg.id;
-        players = msg.players;
-    } else if (msg.type === 'update') {
-        players[msg.id] = msg.player;
-    } else if (msg.type === 'remove') {
-        delete players[msg.id];
-    } else if (msg.type === 'bullets') {
-        bullets = msg.bullets;
-    } else if (msg.type === 'kill') {
-        if (msg.killerId === myId) {
-            killCount++;
-            updateKillCounter();
-        }
-    } else if (msg.type === 'died') {
-        if (players[msg.id]) {
-            players[msg.id].isAlive = false;
-        }
-        // Mostra schermata di morte se il giocatore è morto
-        if (Number(msg.id) === myId) {
-            gameStarted = false;    
-            deathScreen.classList.remove("hidden");
-        }   
-    } else if (msg.type === 'respawned') {
-        if (Number(msg.id) === myId) {
-            gameStarted = true;
-            deathScreen.classList.add("hidden");
-            players[myId] = msg.player;
-            document.getElementById('game').style.filter = "none";
-            updateMinimap(players);
-        } else {
-            console.log("❌ Il messaggio di respawn non è per me.");
-        }
-    }
-};
-
-// =============== FUNZIONI DI GESTIONE INTERFACCIA ===============
-function showLoginScreen() {
-    const startScreen = document.getElementById('startScreen');
-    if (startScreen) {
-        startScreen.style.display = 'flex';
+        const user = onlineUsers[peerNickname];
+        const isActive = peerNickname === currentChat ? 'active' : ''; 
         
-        // Pre-fill del campo nickname
-        const nicknameInput = document.getElementById('nicknameInput');
-        if (nicknameInput && nickname) {
-            nicknameInput.value = nickname;
-        }
+        const dmUnread = conversations[peerNickname] ? conversations[peerNickname].some(m => !m.read) : false;
+        const dmBadge = dmUnread ? `<span class="unread-dot"></span>` : '';
+        
+        chatList.innerHTML += `
+            <div class="chatItem ${isActive}" data-id="${peerNickname}"> 
+                Chat con ${user.nickname} ${dmBadge}
+            </div>
+        `;
     }
     
-    // Resetta lo stato del gioco
-    gameStarted = false;
-    isLoggedIn = false;
-    players = {};
-    bullets = [];
-    killCount = 0;
-    
-    // Nascondi elementi di gioco
-    killCounterDiv.style.display = 'none';
-    
-    // Aggiorna la minimappa anche se il giocatore non è ancora loggato
-    updateMinimap(players);
-}
+    document.querySelectorAll(".chatItem").forEach(item => {
+        item.onclick = () => { 
+            const newChatId = item.dataset.id; 
+            if (newChatId === currentChat) return;
 
-function updateKillCounter() {
-    killCounterDiv.innerText = `Kills: ${killCount}`;
-}
-
-function updateWeaponUI() {
-    document.getElementById('pistol').innerText = `Pistola (${ammo.pistol})`;
-    document.getElementById('shotgun').innerText = `Fucile (${ammo.shotgun})`;
-}
-
-// =============== FUNZIONI DI RENDERING ===============
-function updateMinimap(players) {
-    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
-
-    // Disegna l'intera mappa SVG ridimensionata
-    minimapCtx.drawImage(mappaSVG, 0, 0, MAP_WIDTH * MINIMAP_SCALE, MAP_HEIGHT * MINIMAP_SCALE);
-
-    // Disegna i giocatori, ma non disegnarli se non è loggato
-    for (const id in players) {
-        const p = players[id];
-        if (isLoggedIn) {
-            minimapCtx.fillStyle = id === myId ? 'green' : 'blue';
-        } else {
-            minimapCtx.fillStyle = 'gray'; // Colore dei giocatori non visibili durante il login
-        }
-        minimapCtx.fillRect(p.x * MINIMAP_SCALE, p.y * MINIMAP_SCALE, 5, 5);
-    }
-
-    // Munizioni Pistola
-    minimapCtx.fillStyle = 'yellow';
-    pistolAmmoPacks.forEach(pack => {
-        minimapCtx.fillRect(pack.x * MINIMAP_SCALE, pack.y * MINIMAP_SCALE, 3, 3);
-    });
-
-    // Munizioni Fucile a Pompa
-    minimapCtx.fillStyle = 'orange';
-    shotgunAmmoPacks.forEach(pack => {
-        minimapCtx.fillRect(pack.x * MINIMAP_SCALE, pack.y * MINIMAP_SCALE, 3, 3);
+            document.querySelectorAll(".chatItem").forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            currentChat = newChatId; 
+            
+            if (conversations[currentChat]) {
+                conversations[currentChat].forEach(m => m.read = true);
+            }
+            renderChatList();
+            renderChatHeader(); 
+            renderMessages(); 
+        };
     });
 }
 
-function drawPlayer(player, isSelf = false, offsetX = 0, offsetY = 0) {
-    if (!gameStarted || !player) return;
+// Aggiorna l'header della chat
+function renderChatHeader() {
+    if (!chattingWithName) return; 
 
-    const sprite = player.weapon === "pistol" ? pistolSVG : shotgunSVG;
-
-    // Calcolo delle coordinate effettive di disegno sul canvas
-    let drawX, drawY;
-    if (isSelf) {
-        // Giocatore Locale — Sempre al centro
-        drawX = canvas.width / 2;
-        drawY = canvas.height / 2;
-
-        // Compensazione ai bordi
-        if (players[myId].x < canvas.width / 2) drawX = players[myId].x;
-        if (players[myId].y < canvas.height / 2) drawY = players[myId].y;
-        if (players[myId].x > MAP_WIDTH - canvas.width / 2) drawX = canvas.width - (MAP_WIDTH - players[myId].x);
-        if (players[myId].y > MAP_HEIGHT - canvas.height / 2) drawY = canvas.height - (MAP_HEIGHT - players[myId].y);
-
+    if (currentChat === 'general') {
+        chattingWithName.textContent = "Chat Generale";
+        if (profilePic) profilePic.src = "img/noprofilo.jpg"; 
     } else {
-        // Giocatori Remoti — In base all'offset di telecamera
-        drawX = player.x - offsetX;
-        drawY = player.y - offsetY;
+        const user = onlineUsers[currentChat]; 
+        if (user) {
+            chattingWithName.textContent = user.nickname;
+            if (profilePic) profilePic.src = "img/noprofilo.jpg"; 
+        } else {
+            chattingWithName.textContent = `Chat con ${currentChat} (offline)`; 
+            if (profilePic) profilePic.src = "img/noprofilo.jpg"; 
+        }
     }
-
-    // Calcolo dell'angolo corretto rispetto al mouse
-    const angle = Math.atan2(mouse.y - drawY, mouse.x - drawX);
-
-    ctx.save(); // Salva lo stato del contesto
-
-    // Trasla al centro del personaggio nel canvas
-    ctx.translate(drawX, drawY);
-
-    // Ruota l'immagine
-    ctx.rotate(angle + Math.PI / 2);
-
-    // Disegna l'immagine centrata sul personaggio
-    ctx.drawImage(sprite, -40, -40, 80, 80);
-
-    ctx.restore(); // Ripristina lo stato precedente del contesto
-
-    // Nickname sopra il giocatore
-    ctx.fillStyle = 'white';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(player.nickname || 'Player', drawX, drawY - 50);
-
-    // HP sotto il nickname
-    ctx.fillText(player.hp + " HP", drawX, drawY + 50);
 }
 
-function drawBullet(bullet, offsetX = 0, offsetY = 0) {
-    ctx.save();
-    ctx.translate(bullet.x - offsetX, bullet.y - offsetY);
-    const angle = Math.atan2(bullet.dy, bullet.dx);
-    ctx.rotate(angle);
-    ctx.drawImage(bulletImage, -5, -5, 10, 10);
-    ctx.restore();
-}
 
-function drawAmmoPacks(offsetX = 0, offsetY = 0) {
-    const size = 40; // Dimensione dell'immagine
-    // Munizioni Pistola
-    pistolAmmoPacks.forEach(pack => {
-       ctx.drawImage(pistolAmmoImg, pack.x - offsetX - size / 2, pack.y - offsetY - size / 2, size, size);
+// RENDER MESSAGGI (Visualizzazione File)
+function renderMessages() {
+    messages.innerHTML = "";
+    if (!conversations[currentChat]) return;
+    conversations[currentChat].forEach(m => {
+        
+        const senderIdentifier = m.from || m.id;
+        const isMe = senderIdentifier === nickname; 
+        
+        const div = document.createElement("div");
+        div.classList.add("msg");
+        if (isMe) div.classList.add("me");
+        
+        const senderNickname = m.nickname || `Utente ${senderIdentifier}`;
+        
+        let contentHTML = `<b>${senderNickname}:</b>`;
+        
+        // Se c'è un allegato
+        if (m.file && m.file.base64 && m.file.name) {
+            contentHTML += `<div class="msg-content">`;
+            
+            if (m.file.type && m.file.type.startsWith('image/')) {
+                // Visualizza come Immagine (anteprima)
+                contentHTML += `<img src="${m.file.base64}" alt="${m.file.name}" class="attached-image clickable-image">`;
+                
+            } else {
+                // Visualizza come File linkabile
+                contentHTML += `<a href="${m.file.base64}" download="${m.file.name}" class="attached-file">
+                                         💾 ${m.file.name}
+                                     </a>`;
+            }
+
+            // Aggiunge il testo sotto l'allegato, se presente
+            if (m.text) {
+                contentHTML += `<p style="margin-top: 5px; margin-bottom: 0;">${m.text}</p>`;
+            }
+            contentHTML += `</div>`;
+        } else {
+            // Messaggio di solo testo
+            contentHTML += ` ${m.text}`;
+        }
+        
+        div.innerHTML = contentHTML;
+        messages.appendChild(div);
     });
-
-    // Munizioni Fucile a Pompa
-    shotgunAmmoPacks.forEach(pack => {
-        ctx.drawImage(shotgunAmmoImg, pack.x - offsetX - size / 2, pack.y - offsetY - size / 2, size, size);
-    });
+    
+    messages.scrollTop = messages.scrollHeight;
+    attachImageClickHandlers(); 
 }
 
-// =============== GESTIONE OGGETTI DI GIOCO ===============
-function spawnAmmo(type) {
-    const ammoPack = {
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
-        type: type
+
+// =================================== EVENT HANDLERS ===================================
+
+// LOGICA OCCHIOLINO
+if (togglePassword) {
+    togglePassword.classList.add('hidden'); 
+    togglePassword.onclick = () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        if (type === 'text') {
+            togglePassword.classList.remove('hidden');
+            togglePassword.classList.add('visible'); 
+        } else {
+            togglePassword.classList.remove('visible');
+            togglePassword.classList.add('hidden'); 
+        }
     };
-    if (type === 'pistol') {
-        pistolAmmoPacks.push(ammoPack);
-    } else if (type === 'shotgun') {
-        shotgunAmmoPacks.push(ammoPack);
+}
+
+
+// LOGIN / REGISTRAZIONE 
+loginButton.onclick = () => {
+    const nick = nicknameInput.value.trim();
+    const pass = passwordInput.value;
+    if (!nick || !pass) return alert("Inserisci Nickname e Password.");
+    socket.send(JSON.stringify({ type: "login", nickname: nick, password: pass }));
+};
+
+registerButton.onclick = () => {
+    const nick = nicknameInput.value.trim();
+    const pass = passwordInput.value;
+    if (!nick || !pass) return alert("Inserisci Nickname e Password.");
+    socket.send(JSON.stringify({ type: "register", nickname: nick, password: pass }));
+};
+
+// Funzione principale per l'invio
+function sendMessage(text, fileData = null) {
+    if (currentChat !== "general") {
+        socket.send(JSON.stringify({ 
+            type: "dm", 
+            to: currentChat, 
+            text, 
+            file: fileData
+        }));
+    } else {
+        socket.send(JSON.stringify({ 
+            type: "channel_message", 
+            text, 
+            file: fileData
+        }));
     }
 }
 
-function checkAmmoPickup() {
-    const me = players[myId];
+// Gestore click del pulsante Invia
+sendButton.onclick = () => {
+    const text = messageInput.value.trim();
+    const files = attachmentInput.files;
 
-    // Pistola
-    pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
-        const distance = Math.hypot(me.x - pack.x, me.y - pack.y);
-        if (distance < 20) {
-            ammo.pistol += 10; // Aggiunge 10 colpi
-            updateWeaponUI();
-            return false; // Rimuove il pacco
+    if (!text && files.length === 0) return;
+
+    // 1. GESTIONE SOLO TESTO
+    if (files.length === 0) {
+        if (text.length > MAX_LENGTH) {
+            alert(`Il messaggio supera il limite massimo di ${MAX_LENGTH} caratteri.`);
+            return;
         }
-        return true;
-    });
-
-    // Fucile a Pompa
-    shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
-        const distance = Math.hypot(me.x - pack.x, me.y - pack.y);
-        if (distance < 20) {
-            ammo.shotgun += 5; // Aggiunge 5 colpi
-            updateWeaponUI();
-            return false;
-        }
-        return true;
-    });
-}
-
-// =============== GAME LOOP ===============
-function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (gameStarted && myId && players[myId]) {
-        let me = players[myId];
-
-        // Movimento limitato ai bordi della mappa
-        if (keys['w'] && me.y > 0) me.y -= 2;
-        if (keys['s'] && me.y < MAP_HEIGHT - 10) me.y += 2;
-        if (keys['a'] && me.x > 0) me.x -= 2;
-        if (keys['d'] && me.x < MAP_WIDTH - 10) me.x += 2;
-
-        // Inviamo subito al server il movimento
-        socket.send(JSON.stringify({ type: 'move', x: me.x, y: me.y }));
-
-        // Calcolo dell'offset della camera
-        const offsetX = Math.max(0, Math.min(me.x - canvas.width / 2, MAP_WIDTH - canvas.width));
-        const offsetY = Math.max(0, Math.min(me.y - canvas.height / 2, MAP_HEIGHT - canvas.height));
-
-        // Disegna la mappa
-        ctx.drawImage(mappaSVG, -offsetX, -offsetY, MAP_WIDTH, MAP_HEIGHT);
-
-        // Disegna i giocatori con offset di camera
-        for (let id in players) {
-            const p = players[id];
-            if (p.isAlive && 
-                p.x > offsetX - 50 && p.x < offsetX + canvas.width + 50 &&
-                p.y > offsetY - 50 && p.y < offsetY + canvas.height + 50) {
-                drawPlayer(p, id === myId, offsetX, offsetY);
-            }
-        }
-
-        // Disegna i proiettili con offset di camera
-        for (let bullet of bullets) {
-            if (bullet.x > offsetX && bullet.x < offsetX + canvas.width &&
-                bullet.y > offsetY && bullet.y < offsetY + canvas.height) {
-                drawBullet(bullet, offsetX, offsetY);
-            }
-        }
-
-        drawAmmoPacks(offsetX, offsetY);
-        checkAmmoPickup();
-
-        // Aggiorna la minimappa
-        updateMinimap(players);
+        sendMessage(text);
+        messageInput.value = "";
+        return;
     }
 
-    requestAnimationFrame(gameLoop);
+    // 2. GESTIONE ALLEGATI (Inviamo solo il primo file)
+    const file = files[0]; 
+    if (file.size > 5 * 1024 * 1024) { // Limite 5MB
+        clearAttachment();
+        return alert("File troppo grande. Limite massimo 5MB.");
+    }
+    
+    // Legge il file in Base64
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const base64Data = event.target.result;
+        
+        const fileData = {
+            base64: base64Data, 
+            name: file.name,
+            type: file.type
+        };
+        
+        sendMessage(text, fileData);
+        
+        messageInput.value = "";
+        clearAttachment(); 
+    };
+    
+    reader.onerror = () => alert("Errore nella lettura del file.");
+    
+    reader.readAsDataURL(file); 
+};
+
+
+messageInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { 
+        e.preventDefault(); 
+        sendButton.click(); 
+    }
+});
+
+// Logica Graffetta: Clicca sul pulsante, attiva l'input file nascosto
+if(attachmentButton && attachmentInput) {
+    attachmentButton.onclick = () => {
+        attachmentInput.click(); 
+    };
 }
 
-// =============== INIZIALIZZAZIONE E TIMER ===============
-// Spawn munizioni ogni 15 secondi
-setInterval(() => {
-    spawnAmmo('pistol');
-    spawnAmmo('shotgun');
-}, 15000);
+// LOGICA: Anteprima nella barra di input
+if(attachmentInput) {
+    attachmentInput.onchange = (e) => {
+        const files = e.target.files;
+        if (files.length === 0) {
+            clearAttachment();
+            return;
+        }
 
-// Avvio del game loop
-gameLoop();
+        const file = files[0];
+        
+        if (file.size > 5 * 1024 * 1024) {
+            clearAttachment();
+            return alert("File troppo grande. Limite massimo 5MB.");
+        }
+
+        attachmentPreviewContainer.classList.remove('hidden');
+        previewFileName.textContent = file.name;
+
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                imagePreview.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file); 
+        } else {
+            imagePreview.classList.add('hidden');
+            imagePreview.src = ''; 
+        }
+    };
+}
+
+// Logica Rimuovi Allegato
+if(removeAttachmentButton) {
+    removeAttachmentButton.onclick = clearAttachment;
+}
+
+
+// =================================== SOCKET ONMESSAGE ===================================
+socket.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    
+    if (msg.type === "login_success" || msg.type === "register_success") {
+        nickname = msg.nickname; 
+        loginScreen.style.display = "none";
+        conversations.general = []; 
+        currentChat = "general";
+        
+        renderChatList();
+        const generalItem = document.querySelector(`.chatItem[data-id="general"]`);
+        if(generalItem) generalItem.classList.add('active');
+        
+        renderChatHeader(); 
+        renderMessages();
+    }
+    if (msg.type === "login_fail") alert("Login fallito: nickname o password errati");
+    if (msg.type === "register_fail") alert("Registrazione fallita: " + msg.reason);
+
+    if (msg.type === "online_users") {
+        onlineUsers = {}; 
+        msg.users.forEach(user => {
+            onlineUsers[user.id] = user; 
+        });
+        renderChatList();
+    }
+    
+    if (msg.type === "user_joined") {
+        onlineUsers[msg.id] = { id: msg.id, nickname: msg.nickname };
+        renderChatList();
+    }
+
+    if (msg.type === "user_left") {
+        delete onlineUsers[msg.id];
+        if (currentChat === msg.id) { 
+            currentChat = 'general';
+            renderChatHeader(); 
+            renderMessages();
+        }
+        renderChatList();
+    }
+
+    // MESSAGGIO CHANNEL (Riceve il campo 'file')
+    if (msg.type === "channel_message") {
+        const m = msg.message;
+        const isMe = m.id === nickname; 
+        
+        m.read = isMe || (currentChat === "general"); 
+        conversations.general.push(m);
+        
+        if (currentChat === "general") {
+            renderMessages();
+        } else if (!isMe) {
+            renderChatList(); 
+        }
+    }
+
+    // MESSAGGIO DM (Riceve il campo 'file')
+    if (msg.type === "dm") {
+        const m = msg.message;
+        const isMe = m.from === nickname; 
+        const peer = isMe ? m.to : m.from; 
+        
+        if (!conversations[peer]) conversations[peer] = [];
+        
+        m.read = isMe || (currentChat === peer); 
+        conversations[peer].push(m);
+        
+        if (!onlineUsers[peer]) {
+            onlineUsers[peer] = { id: peer, nickname: m.nickname };
+        }
+        
+        renderChatList();
+        if (currentChat === peer) renderMessages();
+    }
+};
+
+// SOCKET ONMESSAGE (Logica di ricezione messaggi)
+socket.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    
+    if (msg.type === "login_success" || msg.type === "register_success") {
+        nickname = msg.nickname; 
+        loginScreen.style.display = "none";
+        conversations.general = []; 
+        currentChat = "general";
+        
+        renderChatList();
+        const generalItem = document.querySelector(`.chatItem[data-id="general"]`);
+        if(generalItem) generalItem.classList.add('active');
+        
+        renderChatHeader(); 
+        renderMessages();
+    }
+    if (msg.type === "login_fail") alert("Login fallito: nickname o password errati");
+    if (msg.type === "register_fail") alert("Registrazione fallita: " + msg.reason);
+
+    if (msg.type === "online_users") {
+        onlineUsers = {}; 
+        msg.users.forEach(user => {
+            onlineUsers[user.id] = user; 
+        });
+        renderChatList();
+    }
+    
+    if (msg.type === "user_joined") {
+        onlineUsers[msg.id] = { id: msg.id, nickname: msg.nickname };
+        renderChatList();
+    }
+
+    if (msg.type === "user_left") {
+        delete onlineUsers[msg.id];
+        if (currentChat === msg.id) { 
+            currentChat = 'general';
+            renderChatHeader(); 
+            renderMessages();
+        }
+        renderChatList();
+    }
+
+    // MESSAGGIO CHANNEL (Riceve il campo 'file')
+    if (msg.type === "channel_message") {
+        const m = msg.message;
+        const isMe = m.id === nickname; 
+        
+        m.read = isMe || (currentChat === "general"); 
+        conversations.general.push(m);
+        
+        if (currentChat === "general") {
+            renderMessages();
+        } else if (!isMe) {
+            renderChatList(); 
+        }
+    }
+
+    // MESSAGGIO DM (Riceve il campo 'file')
+    if (msg.type === "dm") {
+        const m = msg.message;
+        const isMe = m.from === nickname; 
+        const peer = isMe ? m.to : m.from; 
+        
+        if (!conversations[peer]) conversations[peer] = [];
+        
+        m.read = isMe || (currentChat === peer); 
+        conversations[peer].push(m);
+        
+        // Potrebbe essere un DM da un utente che non era nella lista online
+        if (!onlineUsers[peer]) {
+            onlineUsers[peer] = { id: peer, nickname: m.nickname };
+        }
+        
+        renderChatList();
+        if (currentChat === peer) renderMessages();
+    }
+};

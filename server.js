@@ -1,232 +1,239 @@
 // =============== DIPENDENZE ===============
-const path = require('path');
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
+const path = require("path");
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+// NUOVO: Importazione del modulo sqlite3
+const sqlite3 = require("sqlite3").verbose();
+const { open } = require("sqlite"); // Usiamo la versione con Promise per codice più pulito
 
-// =============== CONFIGURAZIONE SERVER ===============
+// =============== CONFIGURAZIONE DB ===============
+const DB_FILE = path.join(__dirname, "chat.db");
+let db; 
+
+// =============== SERVER SETUP ===============
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+// Aumenta la dimensione massima del payload per gestire i file Base64 (es. 10MB)
+const wss = new WebSocket.Server({ server, maxPayload: 10 * 1024 * 1024 }); 
 
-// Servire file statici
+// Serve static files
 app.use(express.static(path.join(__dirname)));
 
-// =============== COSTANTI E VARIABILI GLOBALI ===============
-const MAP_WIDTH = 3000;
-const MAP_HEIGHT = 3000;
+// =============== DATI SERVER (in RAM) ===============
+// users[tempConnectionId] = { socket, nickname: "...", status: 'connected' };
+let users = {}; 
+let nextTempId = 1; // ID temporaneo per l'oggetto socket in RAM
+const MAX_MESSAGE_LENGTH = 65536; 
 
-// Configurazione armi
-const WEAPONS = {
-  pistol: { damage: 10, speed: 8, range: 800 },
-  shotgun: { damage: 20, speed: 5, range: 600 }
-};
-
-// Stato del gioco
-let players = {};
-let bullets = [];
-let idCounter = 0;
-let pistolAmmoPacks = [];
-let shotgunAmmoPacks = [];
-
-// =============== FUNZIONI DI UTILITY ===============
-// Invia messaggio a tutti i client connessi
-function broadcast(message) {
-  const serializedMessage = JSON.stringify(message);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(serializedMessage);
-      } catch (e) {
-        console.error(`Errore nell'invio del messaggio: ${e.message}`);
-      }
-    }
-  });
+function checkMessageLength(text) {
+    if (typeof text !== 'string') return false; 
+    return text.length <= MAX_MESSAGE_LENGTH;
 }
 
-// =============== GESTIONE MUNIZIONI E OGGETTI ===============
-function spawnAmmo(type) {
-    const ammoPack = {
-        id: Math.random().toString(36).substring(2, 9),
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
-        type: type
-    };
-
-    if (type === 'pistol') {
-        pistolAmmoPacks.push(ammoPack);
-    } else if (type === 'shotgun') {
-        shotgunAmmoPacks.push(ammoPack);
+// NUOVO: Funzione per trovare il TEMPORARY ID a partire dal nickname
+function getTempIdByNickname(nickname) {
+    for (const tempId in users) {
+        if (users[tempId].nickname === nickname) {
+            return Number(tempId);
+        }
     }
+    return null;
+}
 
-    // Invia l'aggiornamento ai client
-    broadcast({
-        type: 'ammo_spawn',
-        ammoPack
+// =============== FUNZIONE BROADCAST ===============
+function broadcast(message, excludeTempId = null) {
+    const data = JSON.stringify(message);
+    wss.clients.forEach(c => {
+        const tempId = Object.keys(users).find(key => users[key].socket === c);
+        
+        if (c.readyState === WebSocket.OPEN && Number(tempId) !== excludeTempId) {
+            c.send(data);
+        }
     });
 }
 
-function checkAmmoPickup() {
-    for (let id in players) {
-        const player = players[id];
+// =============== FUNZIONI ASINCRONE DB ===============
 
-        if (player.isAlive) {
-            // Controllo munizioni pistola
-            pistolAmmoPacks = pistolAmmoPacks.filter(pack => {
-                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
-                    // Incrementa le munizioni sul client
-                    broadcast({ 
-                        type: 'ammo_pickup', 
-                        playerId: id, 
-                        weapon: 'pistol',
-                        amount: 10
-                    });
-                    return false; // Rimuove l'oggetto dall'array
-                }
-                return true;
-            });
-
-            // Controllo munizioni fucile a pompa
-            shotgunAmmoPacks = shotgunAmmoPacks.filter(pack => {
-                if (Math.hypot(pack.x - player.x, pack.y - player.y) < 20) {
-                    broadcast({ 
-                        type: 'ammo_pickup', 
-                        playerId: id, 
-                        weapon: 'shotgun',
-                        amount: 5
-                    });
-                    return false;
-                }
-                return true;
-            });
-        }
-    }
+/** Controlla se un nickname esiste nel DB. */
+async function userExists(nickname) {
+    const user = await db.get("SELECT nickname FROM users WHERE nickname = ?", nickname);
+    return !!user;
 }
 
-// =============== AGGIORNAMENTO PROIETTILI E COLLISIONI ===============
-function updateBullets() {
-  for (let b of bullets) {
-    b.x += b.dx;
-    b.y += b.dy;
-    b.life--;
-
-    for (let pid in players) {
-      if (pid != b.owner && players[pid] && players[pid].isAlive) {
-        const p = players[pid];
-        if (Math.hypot(p.x - b.x, p.y - b.y) < 12) {
-          p.hp -= b.damage;
-
-          if (p.hp <= 0) {
-            p.isAlive = false;
-            broadcast({ type: 'kill', killerId: b.owner, victimId: pid });
-            broadcast({ type: 'died', id: pid });
-          } else {
-            broadcast({ type: 'update', id: pid, player: p });
-          }
-          b.life = 0;
-        }
-      }
-    }
-  }
-  bullets = bullets.filter(b => b.life > 0);
-  broadcast({ type: 'bullets', bullets });
+/** Controlla le credenziali di accesso. Restituisce il nickname se login ok. */
+async function checkLogin(nickname, password) {
+    const user = await db.get("SELECT nickname FROM users WHERE nickname = ? AND password = ?", nickname, password);
+    return user ? user.nickname : null;
 }
 
-// =============== GESTIONE CONNESSIONI WEBSOCKET ===============
-wss.on('connection', socket => {
-  const id = ++idCounter;
+/** Aggiunge un nuovo utente al DB. */
+async function addUser(nickname, password) {
+    await db.run("INSERT INTO users (nickname, password) VALUES (?, ?)", nickname, password);
+}
 
-  // Inizializzazione del nuovo giocatore
-  players[id] = { 
-    x: Math.random() * MAP_WIDTH, 
-    y: Math.random() * MAP_HEIGHT, 
-    hp: 100, 
-    nickname: 'Player' + id, 
-    weapon: 'pistol',
-    isAlive: true 
-  };
 
-  // Invia stato iniziale a questo client
-  socket.send(JSON.stringify({ type: 'init', id, players }));
-  
-  // Notifica agli altri client il nuovo giocatore
-  broadcast({ type: 'update', id, player: players[id] });
+// =============== INIZIALIZZAZIONE DB ===============
+async function initializeDB() {
+    db = await open({
+        filename: DB_FILE,
+        driver: sqlite3.Database
+    });
 
-  socket.on('message', msgStr => {
-    const msg = JSON.parse(msgStr);
-    console.log(`[SERVER] Ricevuto messaggio:`, msg);
+    await db.run(
+        "CREATE TABLE IF NOT EXISTS users (nickname TEXT PRIMARY KEY, password TEXT NOT NULL)"
+    );
+    console.log("Database SQLite pronto e connesso. Nickname usato come Primary Key.");
+}
 
-    // Non processare messaggi per giocatori non vivi
-    if (!players[id]) return;
-  
-    // Gestione messaggi dal client
-    if (msg.type === 'join' && msg.nickname) {
-      // Imposta il nickname e reinizializza il giocatore
-      players[id].nickname = msg.nickname;
-      players[id].isAlive = true;
-      players[id].hp = 100;
-      players[id].x = Math.random() * MAP_WIDTH;
-      players[id].y = Math.random() * MAP_HEIGHT;
-      broadcast({ type: 'update', id, player: players[id] });
-    }
-    else if (msg.type === 'changeWeapon' && WEAPONS[msg.weapon]) {
-      // Cambio arma
-      players[id].weapon = msg.weapon;
-      broadcast({ type: 'update', id, player: players[id] });
-    }
-    else if (msg.type === 'move' && players[id]) {
-      // Aggiornamento posizione
-      players[id].x = msg.x;
-      players[id].y = msg.y;
-      broadcast({ type: 'update', id, player: players[id] });
-    } 
-    else if (msg.type === 'shoot' && players[id]) {
-      // Gestione sparo
-      console.log(`[SERVER] Messaggio di sparo ricevuto da ${id} con arma ${msg.weapon}`);
 
-      const weapon = WEAPONS[msg.weapon] || WEAPONS[players[id].weapon];
-      bullets.push({
-        x: players[id].x,
-        y: players[id].y,
-        dx: Math.cos(msg.angle) * weapon.speed,
-        dy: Math.sin(msg.angle) * weapon.speed,
-        owner: id,
-        life: weapon.range / weapon.speed,
-        damage: weapon.damage
-      });
-    }
-    else if (msg.type === 'respawn' && players[id]) {
-      // Gestione respawn
-      players[id].hp = 100;
-      players[id].isAlive = true;
-      players[id].x = Math.random() * MAP_WIDTH;
-      players[id].y = Math.random() * MAP_HEIGHT;
-      players[id].ammo = { pistol: 15, shotgun: 5 }; // Ricarica munizioni
-      
-      broadcast({ type: 'respawned', id, player: players[id] });
-    }
-  });
-  
-  // Gestione disconnessione
-  socket.on('close', () => {
-    delete players[id];
-    broadcast({ type: 'remove', id });
-  });
+// =============== WEBSOCKET HANDLING ===============
+wss.on("connection", socket => {
+    const tempId = nextTempId++;
+    users[tempId] = { socket, nickname: null, status: 'connecting' };
+
+    socket.send(JSON.stringify({ type: "welcome", id: tempId })); 
+
+    socket.on("message", async data => { 
+        let msg;
+        try { msg = JSON.parse(data); } catch (e) { return; }
+
+        // ----- LOGIN / REGISTRAZIONE -----
+        
+        if (msg.type === "login") {
+            try {
+                const loggedInNickname = await checkLogin(msg.nickname, msg.password);
+                if (loggedInNickname) {
+                    users[tempId].nickname = loggedInNickname;
+                    users[tempId].status = 'connected';
+                    
+                    socket.send(JSON.stringify({ type: "login_success", nickname: loggedInNickname })); 
+
+                    const onlineUsers = Object.keys(users)
+                        .filter(tid => users[tid].nickname && users[tid].nickname !== loggedInNickname) 
+                        .map(tid => ({ id: users[tid].nickname, nickname: users[tid].nickname })); 
+                    socket.send(JSON.stringify({ type: "online_users", users: onlineUsers }));
+                    
+                    broadcast({ type: "user_joined", id: loggedInNickname, nickname: loggedInNickname }, tempId);
+                } else {
+                    socket.send(JSON.stringify({ type: "login_fail" }));
+                }
+            } catch (error) {
+                console.error("Errore DB durante il login:", error);
+                socket.send(JSON.stringify({ type: "login_fail" }));
+            }
+        }
+
+        if (msg.type === "register") {
+            try {
+                if (await userExists(msg.nickname)) {
+                    socket.send(JSON.stringify({ type: "register_fail", reason: "Nickname già esistente" }));
+                } else {
+                    await addUser(msg.nickname, msg.password); 
+                    
+                    users[tempId].nickname = msg.nickname;
+                    users[tempId].status = 'connected';
+
+                    socket.send(JSON.stringify({ type: "register_success", nickname: msg.nickname })); 
+
+                    const onlineUsers = Object.keys(users)
+                        .filter(tid => users[tid].nickname && users[tid].nickname !== msg.nickname)
+                        .map(tid => ({ id: users[tid].nickname, nickname: users[tid].nickname }));
+                    socket.send(JSON.stringify({ type: "online_users", users: onlineUsers }));
+
+                    broadcast({ type: "user_joined", id: msg.nickname, nickname: msg.nickname }, tempId);
+                }
+            } catch (error) {
+                console.error("Errore DB durante la registrazione:", error);
+                socket.send(JSON.stringify({ type: "register_fail", reason: "Errore interno del server." }));
+            }
+        }
+        
+        const senderNickname = users[tempId].nickname;
+        if (!senderNickname) return; 
+
+        // ----- CHAT GENERALE (CON GESTIONE FILE) -----
+        if (msg.type === "channel_message") {
+            const text = msg.text || "";
+            const file = msg.file;
+
+            if (!text && !file) return; 
+
+            if (!checkMessageLength(text)) {
+                console.log(`[AVVISO SICUREZZA] Messaggio troppo lungo (channel).`);
+                return; 
+            }
+            // Controllo dimensione/struttura del file Base64 (max 5MB)
+            if (file && (typeof file.base64 !== 'string' || file.base64.length > 5 * 1024 * 1024 * 1.4)) { 
+                console.log(`[AVVISO SICUREZZA] Dati file non validi o troppo grandi (channel).`);
+                return;
+            }
+
+            broadcast({ 
+                type: "channel_message", 
+                message: { 
+                    id: senderNickname, 
+                    nickname: senderNickname, 
+                    text: text, 
+                    file: file // INOLTRA IL CAMPO FILE
+                } 
+            });
+        }
+
+        // ----- DM (MESSAGGIO PRIVATO CON GESTIONE FILE) -----
+        if (msg.type === "dm") {
+            const text = msg.text || "";
+            const file = msg.file;
+
+            if (!text && !file) return; 
+
+            if (!checkMessageLength(text)) {
+                console.log(`[AVVISO SICUREZZA] Messaggio troppo lungo (dm).`);
+                return; 
+            }
+            if (file && (typeof file.base64 !== 'string' || file.base64.length > 5 * 1024 * 1024 * 1.4)) {
+                console.log(`[AVVISO SICUREZZA] Dati file non validi o troppo grandi (dm).`);
+                return;
+            }
+
+            const receiverNickname = msg.to; 
+            const receiverTempId = getTempIdByNickname(receiverNickname); 
+            const receiver = users[receiverTempId];
+            
+            if (!receiver || receiverTempId === tempId) return; 
+
+            const payload = { 
+                type: "dm", 
+                message: { 
+                    from: senderNickname, 
+                    to: receiverNickname, 
+                    nickname: senderNickname, 
+                    text: text, 
+                    file: file // INOLTRA IL CAMPO FILE
+                } 
+            };
+            
+            receiver.socket.send(JSON.stringify(payload));
+            users[tempId].socket.send(JSON.stringify(payload));
+        }
+    });
+
+    // ----- DISCONNESSIONE -----
+    socket.on("close", () => {
+        if (users[tempId] && users[tempId].nickname) {
+            broadcast({ type: "user_left", id: users[tempId].nickname, nickname: users[tempId].nickname });
+        }
+        delete users[tempId];
+    });
 });
-
-// =============== TIMER E INTERVALLI ===============
-// Aggiorna lo stato dei proiettili e delle collisioni
-setInterval(updateBullets, 1000 / 30); // 30 fps
-
-// Controlla pickup di munizioni
-setInterval(checkAmmoPickup, 300);
-
-// Genera nuove munizioni
-setInterval(() => {
-    spawnAmmo('pistol');
-    spawnAmmo('shotgun');
-}, 15000); // Ogni 15 secondi
 
 // =============== AVVIO SERVER ===============
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Game server running on port ${PORT}`));
+
+initializeDB().then(() => {
+    server.listen(PORT, () => {
+        console.log(`Server avviato su http://localhost:${PORT}`);
+    });
+}).catch(err => {
+    console.error("Impossibile avviare il server a causa di un errore DB:", err);
+});
