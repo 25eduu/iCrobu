@@ -1,620 +1,354 @@
-/* ============================================
-   iCROBU CHAT - MODERN GLASS-MORPHISM CSS
-   ============================================ */
-
-/* VARIABILI CSS */
-:root {
-    --primary: #10b981;
-    --primary-dark: #059669;
-    --primary-light: #34d399;
-    --primary-glow: rgba(16, 185, 129, 0.4);
-    
-    --background: #f0f2f5;
-    --surface: #ffffff;
-    --surface-hover: #f8f9fa;
-    --border: rgba(0, 0, 0, 0.08);
-    
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
-    --text-muted: #9ca3af;
-    
-    --message-sent: #dcf8c6;
-    --message-received: #ffffff;
-    
-    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.12);
-    --shadow-glow: 0 0 20px var(--primary-glow);
-    
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-full: 9999px;
-    
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  /* RESET E STRUTTURA GENERALE */
-  * {
-    box-sizing: border-box;
-  }
-  
-  body {
+/* RESET E STRUTTURA GENERALE */
+body {
     height: 100vh;
     display: flex;
-    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--background);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5; 
     overflow: hidden;
     margin: 0;
-  }
-  
-  /* ================== SCHERMATA DI LOGIN ================== */
-  #loginScreen {
+}
+
+/* -------------------- SCHERMATA DI LOGIN -------------------- */
+#loginScreen {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #1e7225 0%, #2a9839 100%); 
     color: white;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: 100;
-    overflow: hidden;
-  }
-  
-  /* Effetti sfondo animati */
-  #loginScreen::before,
-  #loginScreen::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    filter: blur(60px);
-    animation: float 6s ease-in-out infinite;
-  }
-  
-  #loginScreen::before {
-    width: 400px;
-    height: 400px;
-    top: -100px;
-    left: -100px;
-  }
-  
-  #loginScreen::after {
-    width: 500px;
-    height: 500px;
-    bottom: -150px;
-    right: -150px;
-    animation-delay: 2s;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-30px) scale(1.05); }
-  }
-  
-  #loginScreen h2 {
-    font-size: 2.8em;
-    margin-bottom: 10px;
-    font-weight: 700;
-    letter-spacing: -1px;
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
-    position: relative;
-    z-index: 1;
-  }
-  
-  .login-form-container {
-    background: rgba(255, 255, 255, 0.12);
-    padding: 50px 40px;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    z-index: 100; 
+}
+
+#loginScreen h2 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+.login-form-container {
+    background: rgba(255, 255, 255, 0.1); 
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     text-align: center;
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px); 
+}
+
+.input-wrapper {
     position: relative;
-    z-index: 1;
-    animation: slideUp 0.6s ease-out;
-  }
-  
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .input-wrapper {
-    position: relative;
-    width: 300px;
-    margin: 0 auto 20px;
-  }
-  
-  .input-wrapper input {
-    width: 100%;
-    padding: 16px 20px;
-    border: 2px solid transparent;
-    border-radius: var(--radius-md);
+    width: 280px; 
+    margin: 0 auto 15px; 
+}
+
+.input-wrapper input {
+    width: 100%; 
+    padding: 12px 15px;
+    border: none;
+    border-radius: 8px;
     font-size: 16px;
-    background: rgba(255, 255, 255, 0.95);
-    color: var(--text-primary);
-    transition: var(--transition);
-    box-sizing: border-box;
-  }
-  
-  .input-wrapper input::placeholder {
-    color: var(--text-muted);
-  }
-  
-  .input-wrapper input:focus {
-    outline: none;
-    border-color: var(--primary-light);
-    background: white;
-    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.2);
-  }
-  
-  .password-input-wrapper input {
-    padding-right: 50px;
-  }
-  
-  .password-toggle {
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    transition: all 0.3s ease;
+    box-sizing: border-box; 
+    margin-bottom: 0; 
+}
+
+.password-input-wrapper input {
+    padding-right: 40px; 
+}
+
+.password-toggle {
     position: absolute;
     top: 50%;
-    right: 18px;
-    transform: translateY(-50%);
+    right: 15px; 
+    transform: translateY(-50%); 
     cursor: pointer;
-    width: 24px;
-    height: 24px;
+    width: 20px; 
+    height: 20px; 
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    opacity: 0.6;
-    transition: var(--transition);
-  }
-  
-  .password-toggle:hover {
+    opacity: 0.8; 
+    transition: opacity 0.2s;
+}
+
+.password-toggle:hover {
     opacity: 1;
-  }
-  
-  .password-toggle.hidden {
-    background-image: url('img/eye-open.png');
-  }
-  
-  .password-toggle.visible {
-    background-image: url('img/eye-closed.png');
-  }
-  
-  #loginScreen button {
-    width: 140px;
-    padding: 14px 20px;
-    margin-top: 25px;
+}
+
+/* Icone (assicurati di avere eye-open.png e eye-closed.png nella cartella img/) */
+.password-toggle.hidden {
+    background-image: url('img/eye-open.png'); 
+}
+
+.password-toggle.visible {
+    background-image: url('img/eye-closed.png'); 
+}
+
+#loginScreen input:focus {
+    outline: 2px solid #5dec75;
+    background: white;
+}
+
+#loginScreen button {
+    width: 130px;
+    padding: 12px;
+    margin-top: 20px;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: 8px;
     font-size: 16px;
-    font-weight: 600;
+    font-weight: bold;
     cursor: pointer;
-    transition: var(--transition);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  #loginButton {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    transition: background 0.3s ease, transform 0.1s;
+}
+
+#loginButton {
+    background: #5d9cec; 
     color: white;
-    margin-right: 12px;
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-  }
-  
-  #loginButton:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
-  }
-  
-  #registerButton {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-  }
-  
-  #registerButton:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-  }
-  
-  /* ================== LAYOUT CHAT PRINCIPALE ================== */
-  #sidebar {
-    width: 350px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
+    margin-right: 10px;
+}
+
+#registerButton {
+    background: #ccc; 
+    color: #333;
+}
+
+#loginButton:hover {
+    background: #4a89dc;
+    transform: translateY(-1px);
+}
+
+#registerButton:hover {
+    background: #bbb;
+    transform: translateY(-1px);
+}
+
+
+/* -------------------- LAYOUT CHAT PRINCIPALE -------------------- */
+#sidebar {
+    width: 320px;
+    background: white;
+    border-right: 1px solid #ddd;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow-soft);
-  }
-  
-  #sidebar h3 {
-    padding: 20px;
-    margin: 0;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-    font-size: 1.3em;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
-  
-  #chatList {
+}
+
+#chatList {
     flex: 1;
     overflow-y: auto;
-    background: var(--surface);
-  }
-  
-  #chatList::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  #chatList::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  #chatList::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
-    border-radius: var(--radius-full);
-  }
-  
-  .chatItem {
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--border);
+    background: #f8f9fa;
+}
+
+.chatItem {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
     cursor: pointer;
-    transition: var(--transition);
+    transition: background 0.2s;
     display: flex;
     align-items: center;
-    gap: 12px;
-    position: relative;
-  }
-  
-  .chatItem:hover {
-    background: var(--surface-hover);
-  }
-  
-  .chatItem.active {
-    background: linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
-    border-left: 3px solid var(--primary);
-  }
-  
-  .chatItem.active b {
-    color: var(--primary-dark);
-  }
-  
-  /* Pallino di non letto */
-  .unread-dot {
-    width: 10px;
-    height: 10px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    position: relative; 
+}
+
+/* Pallino di non letto */
+.unread-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #008069; 
     border-radius: 50%;
-    margin-left: auto;
+    margin-left: 10px;
     flex-shrink: 0;
-    box-shadow: 0 0 8px var(--primary-glow);
-    animation: pulse 2s ease-in-out infinite;
-  }
-  
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); opacity: 0.8; }
-  }
-  
-  /* ================== MAIN CHAT ================== */
-  #mainChat {
+}
+
+.chatItem:hover { background: #e9ecef; }
+.chatItem.active { background: #d0e7ff; font-weight: bold; color: #2a5298; }
+
+
+#mainChat {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719142-8255941c-7362-11e7-91bf-650a6237c02b.png') repeat;
-  }
-  
-  #chatHeader {
-    padding: 16px 20px !important;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
-    color: white;
-    display: flex;
-    align-items: center;
-    box-shadow: var(--shadow-medium);
-    z-index: 10;
-  }
-  
-  #chatHeader #profilePic {
-    width: 45px !important;
-    height: 45px !important;
-    border-radius: 50%;
-    margin-right: 15px !important;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    object-fit: cover;
-  }
-  
-  #chatHeader #chattingWithName {
-    font-size: 1.1em;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-  }
-  
-  /* ================== MESSAGGI ================== */
-  #messages {
+    /* Sfondo tipo WhatsApp */
+    background: #e5ddd5 url('https://user-images.githubusercontent.com/15075759/28719142-8255941c-7362-11e7-91bf-650a6237c02b.png') repeat; 
+}
+
+/* -------------------- MESSAGGI E ALLEGATI RICEVUTI -------------------- */
+#messages {
     flex: 1;
     overflow-y: auto;
-    padding: 25px 20px;
-  }
-  
-  #messages::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  #messages::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  #messages::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: var(--radius-full);
-  }
-  
-  .msg {
-    max-width: 65%;
-    padding: 12px 16px;
-    border-radius: var(--radius-md);
-    margin-top: 6px;
-    margin-bottom: 6px;
+    padding: 20px 15px; 
+}
+
+.msg {
+    max-width: 60%; 
+    padding: 10px 14px;
+    border-radius: 8px; 
+    margin-top: 5px;
+    margin-bottom: 5px;
     clear: both;
     font-size: 0.95em;
-    line-height: 1.5;
-    box-shadow: var(--shadow-soft);
-    word-break: break-word;
+    line-height: 1.4;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13); 
+    word-break: break-all; 
+    word-wrap: break-word; 
     overflow-wrap: break-word;
-    animation: messageIn 0.3s ease-out;
-    position: relative;
-  }
-  
-  @keyframes messageIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px) scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-  
-  .msg {
-    background-color: var(--message-received);
+}
+
+.msg {
+    background-color: white; 
     margin-right: auto;
     float: left;
     text-align: left;
-    color: var(--text-primary);
-    border-bottom-left-radius: 4px;
-  }
-  
-  .msg.me {
-    background: linear-gradient(135deg, #dcf8c6 0%, #c8f0b4 100%);
+    color: #333;
+}
+
+.msg.me {
+    background-color: #dcf8c6; 
     float: right;
     margin-left: auto;
-    text-align: left;
-    color: var(--text-primary);
-    border-bottom-right-radius: 4px;
-    border-bottom-left-radius: var(--radius-md);
-  }
-  
-  .msg b {
-    color: var(--primary-dark);
-    font-weight: 600;
-  }
-  
-  /* STILI PER GLI ALLEGATI */
-  .attached-image {
-    max-width: 280px;
+    text-align: left; 
+    color: #111;
+}
+
+/* STILI PER GLI ALLEGATI NELLA CHAT */
+.attached-image {
+    max-width: 250px;
     height: auto;
-    border-radius: var(--radius-sm);
-    margin-top: 8px;
+    border-radius: 5px;
+    margin-top: 5px;
     display: block;
-    box-shadow: var(--shadow-soft);
-    transition: var(--transition);
-  }
-  
-  .attached-image:hover {
-    transform: scale(1.02);
-    box-shadow: var(--shadow-medium);
-  }
-  
-  .attached-file {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 10px 16px;
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-    border-radius: var(--radius-sm);
+}
+
+.attached-file {
+    display: block;
+    margin-top: 5px;
+    padding: 5px 10px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
     text-decoration: none;
-    color: var(--text-primary);
+    color: #333;
     font-size: 14px;
-    font-weight: 500;
-    transition: var(--transition);
-    border: 1px solid var(--border);
-  }
-  
-  .attached-file:hover {
-    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-    transform: translateY(-1px);
-  }
-  
-  /* ================== BARRA DI INPUT ================== */
-  #inputRow {
+}
+
+
+/* -------------------- BARRA DI INPUT (CON ALLEGATO) -------------------- */
+#inputRow {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
-    background: var(--surface);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-    gap: 12px;
-  }
-  
-  #attachmentButton {
-    background: url('img/allegati.png') no-repeat center center;
-    background-size: 60%;
-    width: 45px;
-    height: 45px;
+    padding: 8px 15px;
+    background: #f0f2f5; 
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.05);
+}
+
+#attachmentButton {
+    background: url('img/allegati.png') no-repeat center center; 
+    background-size: 80%; 
+    width: 35px; 
+    height: 35px; 
     border: none;
-    border-radius: var(--radius-full);
+    color: transparent; 
     cursor: pointer;
-    transition: var(--transition);
-    background-color: var(--surface-hover);
-  }
-  
-  #attachmentButton:hover {
-    background-color: rgba(16, 185, 129, 0.1);
-    transform: scale(1.05);
-  }
-  
-  #messageInput {
+    margin-right: 10px;
+    padding: 0;
+    line-height: 1;
+}
+
+#messageInput {
     flex: 1;
-    border: 2px solid var(--border);
-    border-radius: var(--radius-full);
-    padding: 14px 24px;
+    border: none;
+    border-radius: 25px; 
+    padding: 12px 20px;
     font-size: 16px;
     outline: none;
-    background: var(--surface-hover);
-    transition: var(--transition);
-    color: var(--text-primary);
-  }
-  
-  #messageInput::placeholder {
-    color: var(--text-muted);
-  }
-  
-  #messageInput:focus {
-    border-color: var(--primary);
-    background: var(--surface);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-  }
-  
-  #sendButton {
-    width: 50px;
-    height: 50px;
-    padding: 0;
+    background: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+#sendButton {
+    /* Imposta la dimensione per l'icona */
+    width: 45px; 
+    height: 45px; 
+    padding: 0; /* Rimuovi qualsiasi padding interno */
+    
     border: none;
-    border-radius: var(--radius-full);
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 0; /* Rimosso l'arrotondamento */
+    
+    /* Rimuovi completamente lo sfondo, lasciando solo l'immagine */
+    background: transparent; 
+    
+    margin-left: 8px;
     cursor: pointer;
-    box-shadow: 0 4px 15px var(--primary-glow);
-    background-image: url('img/invia.png');
-    background-size: 55%;
+    box-shadow: none; /* Rimuovi l'ombra */
+    
+    /* === REGOLE PER L'IMMAGINE === */
+    background-image: url('img/invia.png'); /* Carica la tua immagine */
+    background-size: 100%; /* L'immagine riempie l'area 45x45 */
     background-repeat: no-repeat;
-    background-position: center;
-    font-size: 0;
+    background-position: center; /* Centra l'icona */
+    
+    /* Rimuove il testo "Invia" dal pulsante */
+    font-size: 0; 
     line-height: 0;
-    transition: var(--transition);
-  }
-  
-  #sendButton:hover {
-    transform: scale(1.08);
-    box-shadow: var(--shadow-glow);
-  }
-  
-  #sendButton:active {
-    transform: scale(0.95);
-  }
-  
-  /* ================== ANTEPRIMA ALLEGATO ================== */
-  #attachmentPreviewContainer {
+    
+    transition: opacity 0.2s; /* Transizione per l'effetto hover */
+}
+
+/* Effetto al passaggio del mouse: cambia l'opacità per dare feedback */
+#sendButton:hover {
+    background-color: transparent; /* Assicura che rimanga trasparente */
+    opacity: 0.7; /* L'icona diventa leggermente trasparente quando cliccabile */
+}
+
+
+/* -------------------- ANTEPRIMA ALLEGATO IN INPUT -------------------- */
+#attachmentPreviewContainer {
     display: flex;
     align-items: center;
-    padding: 15px 20px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, var(--surface) 100%);
-    border-top: 1px solid var(--border);
-    gap: 15px;
-    animation: slideUp 0.3s ease-out;
-  }
-  
-  #attachmentPreviewContainer.hidden {
+    padding: 10px 15px;
+    background: #f0f2f5;
+    border-top: 1px solid #e0e0e0;
+}
+
+#attachmentPreviewContainer.hidden {
     display: none;
-  }
-  
-  #imagePreview {
-    max-width: 100px;
-    max-height: 100px;
-    border-radius: var(--radius-sm);
-    object-fit: cover;
-    box-shadow: var(--shadow-soft);
-    border: 2px solid var(--border);
-  }
-  
-  #imagePreview.hidden {
-    display: none;
-  }
-  
-  #previewFileName {
+}
+
+#previewFileName {
     flex: 1;
     font-size: 14px;
-    color: var(--text-secondary);
+    color: #555;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-weight: 500;
-  }
-  
-  #removeAttachmentButton {
-    background: url('img/rimuovi.png') no-repeat center center;
-    background-size: 50%;
-    width: 36px;
-    height: 36px;
+    margin-left: 10px;
+}
+
+#removeAttachmentButton {
+    background: url('img/rimuovi.png') no-repeat center center; 
+    background-size: 70%; 
+    width: 20px; 
+    height: 20px; 
     border: none;
-    border-radius: var(--radius-full);
+    color: transparent; 
     cursor: pointer;
-    background-color: #fee2e2;
-    transition: var(--transition);
-  }
-  
-  #removeAttachmentButton:hover {
-    background-color: #fecaca;
-    transform: scale(1.1);
-  }
-  
-  /* ================== RESPONSIVE ================== */
-  @media (max-width: 768px) {
-    #sidebar {
-      width: 100%;
-      position: absolute;
-      left: -100%;
-      z-index: 50;
-      transition: var(--transition);
-    }
-    
-    #sidebar.open {
-      left: 0;
-    }
-    
-    .login-form-container {
-      padding: 30px 25px;
-      margin: 0 20px;
-    }
-    
-    .input-wrapper {
-      width: 100%;
-    }
-    
-    #loginScreen h2 {
-      font-size: 2em;
-    }
-    
-    .msg {
-      max-width: 85%;
-    }
-  }
-  
-  /* ================== UTILITY CLASSES ================== */
-  .hidden {
-    display: none !important;
-  }
-  
-  /* Font import */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  
+    font-size: 14px;
+    margin-left: 10px;
+    padding: 0;
+}
+
+#removeAttachmentButton:hover {
+    background: url('img/rimuovi.png') no-repeat center center;
+    background-size: 70%; 
+    opacity: 0.7;
+}
+
+#imagePreview {
+    max-width: 80px;
+    max-height: 80px;
+    margin-right: 10px;
+    border-radius: 5px;
+    object-fit: cover;
+}
